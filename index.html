@@ -1062,6 +1062,8 @@ function rebuildScene() {
 
 /* --- 3. UI GENERATION --- */
 function openMenu(menuName, scrollTarget) {
+
+  if(menuName !== ui.activeMenu) vibro('light');
     // --- 1. ЗАПОМИНАЕМ ТЕКУЩИЙ СКРОЛЛ ---
     let savedScroll = 0;
     let wasDecorListOpen = false;
@@ -1557,6 +1559,7 @@ html += mkSelector('Режим наложения', texData.mode, texModes, "upd
 /* --- 4. FUNCTIONS --- */
 
   // Функция для создания горизонтального меню (Чипсов)
+// Функция для создания горизонтального меню (Чипсов) + ВИБРАЦИЯ
 function mkSelector(label, currentVal, options, onSelectStr) {
     let html = `<div class="control-group">`;
     if(label) html += `<label class="control-label">${label}</label>`;
@@ -1564,13 +1567,12 @@ function mkSelector(label, currentVal, options, onSelectStr) {
     html += `<div class="chip-scroll">`;
     
     options.forEach(opt => {
-        // Проверяем, активна ли эта кнопка
         const isActive = (opt.val === currentVal);
-        // Экранируем кавычки для JS вызова
         const safeVal = opt.val.replace(/'/g, "\\'");
         
+        // ДОБАВИЛИ: vibro('light'); перед вызовом логики
         html += `<button class="chip-btn ${isActive ? 'active' : ''}" 
-                         onclick="${onSelectStr.replace('__VAL__', safeVal)}">
+                         onclick="vibro('light'); ${onSelectStr.replace('__VAL__', safeVal)}">
                     ${opt.icon ? `<span>${opt.icon}</span>` : ''}
                     <span>${opt.label}</span>
                  </button>`;
@@ -1579,19 +1581,30 @@ function mkSelector(label, currentVal, options, onSelectStr) {
     html += `</div></div>`;
     return html;
 }
+
+                      
+/* --- HAPTIC FEEDBACK --- */
+function vibro(force) {
+    if (navigator.vibrate) {
+        // 'light' = легкий щелчок (10мс)
+        // 'medium' = обычное нажатие (25мс)
+        // иначе = переданное число мс
+        const ms = (force === 'light') ? 10 : ((force === 'medium' || !force) ? 25 : force);
+        navigator.vibrate(ms);
+    }
+}
+  
 function mkStepper(lbl, val, onInp, onDec, onInc) {
-    // ИСПРАВЛЕНИЕ: Экранируем кавычки, чтобы JS код внутри HTML не ломался
-    // Было: startHold('stepProp('d', 10)') -> ОШИБКА
-    // Стало: startHold('stepProp(\'d\', 10)') -> ОК
     const safeDec = onDec.replace(/'/g, "\\'");
     const safeInc = onInc.replace(/'/g, "\\'");
 
+    // ДОБАВИЛИ: vibro('medium') в onpointerdown
     return `<div class="control-group">
               <label class="control-label">${lbl}</label>
               <div class="stepper">
-                <button onpointerdown="startHold('${safeDec}')" onpointerup="stopHold()" onpointerleave="stopHold()">-</button>
+                <button onpointerdown="vibro('medium'); startHold('${safeDec}')" onpointerup="stopHold()" onpointerleave="stopHold()">-</button>
                 <input type="number" value="${val}" oninput="${onInp}">
-                <button onpointerdown="startHold('${safeInc}')" onpointerup="stopHold()" onpointerleave="stopHold()">+</button>
+                <button onpointerdown="vibro('medium'); startHold('${safeInc}')" onpointerup="stopHold()" onpointerleave="stopHold()">+</button>
               </div>
             </div>`;
 }
@@ -1685,7 +1698,7 @@ function stepTex(key, delta) {
     rebuildScene(); recordHistory();
 }
 
-function setTab(t) { ui.colorTab = t; openMenu('color'); }
+function setTab(t) { vibro('light');ui.colorTab = t; openMenu('color'); }
 function setTexPart(p) { ui.activeTexPart = p; openMenu('color'); }
 function compressImage(file, maxSize, callback) {
     const reader = new FileReader(); reader.onload = e => {
@@ -1708,6 +1721,7 @@ function updateTexProp(key, val) {
 }
 
 function switchCake(id) {
+  vibro(30);
     // ... (код переключения viewMode как и был) ...
     if (id === 'both') { 
         viewMode = 'both'; activeCakeId = 0; 
@@ -3640,6 +3654,7 @@ init();
 </script>
 </body>
 </html>
+
 
 
 
