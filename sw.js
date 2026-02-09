@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cake-3d-v2.5';
+const CACHE_NAME = 'cake-3d-v2.6';
 const ASSETS = [
   './',
   './index.html',
@@ -43,5 +43,6 @@ self.addEventListener('fetch', (e) => {
       })
   );
 });
+
 
 
