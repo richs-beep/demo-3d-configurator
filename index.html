@@ -358,15 +358,49 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); 
     transform: scale(0.95);
 }
 
+/* --- ЛАНДШАФТНЫЙ РЕЖИМ (ГОРИЗОНТАЛЬНЫЙ) --- */
 @media (orientation: landscape) {
   #ui-layer { flex-direction: row; }
-  .toolbar { width: 70px; height: 100%; flex-direction: column; justify-content: center; border-top: none; border-left: 1px solid #eee; order: 2; padding: 0; }
-  .toolbar.hidden { transform: translateX(100%); }
-  .bottom-sheet { left: auto; right: 0; bottom: 0; top: 0; width: 320px; height: 100%; max-height: 100%; border-radius: 0; border-left: 1px solid #eee; transform: translateX(110%); }
-  .bottom-sheet.open { transform: translateX(0); }
-  .top-bar { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: auto; }
-  .top-tools { top: 10px; right: 80px; }
-  #compare-overlay { left: 20px; top: 60px; }
+  
+  /* Боковая панель навигации (слева) */
+  .toolbar { 
+      width: 70px; height: 100%; 
+      flex-direction: column; justify-content: center; 
+      border-top: none; border-left: none; border-right: 1px solid #eee; 
+      order: 1; padding: 0; 
+  }
+  .toolbar.hidden { transform: translateX(-100%); }
+  
+  /* Шторка превращается в Боковую панель (справа) */
+  .bottom-sheet { 
+      left: auto; right: 0; bottom: 0; top: 0; 
+      width: 320px; 
+      height: 100% !important;     /* Игнорируем JS-высоту */
+      max-height: 100% !important; 
+      min-height: 100% !important;
+      
+      border-radius: 0; border-left: 1px solid #eee; border-top: none;
+      
+      /* Позиция по умолчанию (Открыто) */
+      transform: translateX(0); 
+  }
+  
+  /* Скрытое состояние для боковой панели (Уезжает вправо) */
+  .bottom-sheet.hidden-sheet { 
+      transform: translateX(100%) !important; /* Перебиваем translateY */
+  }
+  
+  /* Скрываем ручку, так как тянуть нельзя */
+  .sheet-handle-area { display: none; }
+  
+  /* Верхний бар */
+  .top-bar { 
+      position: absolute; top: 0; left: 50%; 
+      transform: translateX(-50%); width: auto; 
+  }
+  .top-tools { top: 10px; right: 340px; } /* Сдвигаем левее, чтобы не наехать на панель */
+  
+  #compare-overlay { left: 80px; top: 20px; }
 }
 /* --- МОБИЛЬНАЯ ОПТИМИЗАЦИЯ (Крупные кнопки снизу) --- */
     @media (max-width: 800px) {
@@ -3672,6 +3706,7 @@ init();
 </script>
 </body>
 </html>
+
 
 
 
