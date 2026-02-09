@@ -30,11 +30,17 @@ self.addEventListener('activate', (e) => {
 });
 
 // 3. Перехват запросов: если нет интернета, берем из кэша
+// СТРАТЕГИЯ: NETWORK FIRST (Сначала Интернет, потом Кэш)
+// Идеально для разработки, чтобы всегда видеть свежую версию
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((response) => {
-      return response || fetch(e.request);
-    })
+    fetch(e.request)
+      .then((response) => {
+        return response; // Если интернет есть — отдаем свежий файл с сервера
+      })
+      .catch(() => {
+        return caches.match(e.request); // Если интернета нет — берем старый из кэша
+      })
   );
-
 });
+
