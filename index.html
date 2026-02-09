@@ -2571,11 +2571,21 @@ function stepDecorDim(key, delta) {
 if (typeof holdTimer === 'undefined') var holdTimer = null; 
 
 // Эта функция выполняет ЛЮБОЙ код много раз, пока держишь кнопку
+// Эта функция выполняет ЛЮБОЙ код много раз, пока держишь кнопку
 function startHold(code) {
     if(holdTimer) clearInterval(holdTimer);
+    
     const func = new Function(code);
-    func(); // Срабатываем сразу при нажатии
-    holdTimer = setInterval(func, 100); // Повторяем каждые 100мс
+    
+    // 1. Срабатываем сразу при нажатии
+    func(); 
+    vibro('medium'); // Первый "тук" посильнее
+    
+    // 2. Повторяем каждые 100мс (пока держишь)
+    holdTimer = setInterval(() => {
+        func();          // Меняем значение
+        vibro('light');  // Легкий "тук" на каждый шаг (эффект трещотки)
+    }, 100); 
 }
 
 function stopHold() {
@@ -3654,6 +3664,7 @@ init();
 </script>
 </body>
 </html>
+
 
 
 
