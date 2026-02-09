@@ -303,6 +303,53 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); 
 .nav-icon { font-size: 24px; transition: 0.2s; }
 .nav-item.active { color: var(--primary); }
 
+
+  /* --- ГОРИЗОНТАЛЬНЫЕ ЧИПСЫ (CHIPS) --- */
+.chip-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px; /* Место для тени */
+    margin-bottom: 12px;
+    scrollbar-width: none; /* Скрываем скроллбар (Firefox) */
+    -ms-overflow-style: none; /* Скрываем скроллбар (IE/Edge) */
+    
+    /* Инерция скролла для iOS - чтобы летало плавно */
+    -webkit-overflow-scrolling: touch; 
+}
+/* Скрываем скроллбар (Chrome/Safari) */
+.chip-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.chip-btn {
+    flex-shrink: 0; /* Не сжимать кнопки */
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 20px; /* Овальная форма */
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+/* Активное состояние */
+.chip-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(236, 72, 153, 0.4);
+}
+
+/* Нажатие */
+.chip-btn:active {
+    transform: scale(0.95);
+}
+
 @media (orientation: landscape) {
   #ui-layer { flex-direction: row; }
   .toolbar { width: 70px; height: 100%; flex-direction: column; justify-content: center; border-top: none; border-left: 1px solid #eee; order: 2; padding: 0; }
@@ -1074,16 +1121,19 @@ function openMenu(menuName, scrollTarget) {
         html += `<div class="control-group"><div class="btn-grid"><button class="btn-sec" onclick="moveTier(1)">▲ Вверх</button><button class="btn-sec" onclick="moveTier(-1)">▼ Вниз</button></div></div>`;
         
         // Выбор формы
-        html += `<div class="control-group"><label class="control-label">Форма</label>
-                 <select class="btn-sec" style="width:100%" onchange="updateTierProp('shape', this.value)">
-                    <option value="cylinder" ${t.shape=='cylinder'?'selected':''}>Цилиндр</option>
-                    <option value="box" ${t.shape=='box'?'selected':''}>Куб</option>
-                    <option value="parallelepiped" ${t.shape=='parallelepiped'?'selected':''}>Прямоугольник</option>
-                    <option value="sphere" ${t.shape=='sphere'?'selected':''}>Шар</option>
-                    <option value="ngon" ${t.shape=='ngon'?'selected':''}>Многоугольник</option>
-                    <option value="heart" ${t.shape=='heart'?'selected':''}>Сердце</option>
-                    <option value="star" ${t.shape=='star'?'selected':''}>Звезда</option>
-                 </select></div>`;
+        // --- ЗАМЕНА SELECT НА CHIPS (Вставляем сюда) ---
+        const shapes = [
+            {val:'cylinder', label:'Цилиндр', icon:'⚪'},
+            {val:'box', label:'Куб', icon:'📦'},
+            {val:'parallelepiped', label:'Прямоуг.', icon:'▭'},
+            {val:'sphere', label:'Шар', icon:'🔮'},
+            {val:'heart', label:'Сердце', icon:'❤️'},
+            {val:'star', label:'Звезда', icon:'⭐'},
+            {val:'ngon', label:'Многоуг.', icon:'🔷'}
+        ];
+
+        // Генерируем ленту:
+        html += mkSelector('Форма яруса', t.shape, shapes, "updateTierProp('shape', '__VAL__')");
                  
         // === СЕТКА ПАРАМЕТРОВ (GRID) ===
         html += `<div class="control-grid-2">`;
@@ -1208,7 +1258,11 @@ function openMenu(menuName, scrollTarget) {
                                 <input type="checkbox" id="tex-mix" ${texData.mixColor ? 'checked' : ''} onchange="updateTexProp('mixColor', this.checked)">
                                 <label for="tex-mix" style="margin:0; font-weight:600; font-size:13px">Наложить цвет яруса (Tint)</label>
                              </div>`;
-                    html += `<div class="control-group"><label class="control-label">Режим</label><select class="btn-sec" style="width:100%" onchange="updateTexProp('mode', this.value)"><option value="tile" ${texData.mode==='tile'?'selected':''}>Плитка (Повтор)</option><option value="fit" ${texData.mode==='fit'?'selected':''}>Растянуть</option></select></div>`;
+                    const texModes = [
+    {val:'tile', label:'Плитка (Повтор)', icon:'▦'},
+    {val:'fit', label:'Растянуть (Fit)', icon:'↔️'}
+];
+html += mkSelector('Режим наложения', texData.mode, texModes, "updateTexProp('mode', '__VAL__')");
                     
                     // Сетка настроек текстуры
                     html += `<div class="control-grid-2">
@@ -1501,6 +1555,30 @@ function openMenu(menuName, scrollTarget) {
     }
 }
 /* --- 4. FUNCTIONS --- */
+
+  // Функция для создания горизонтального меню (Чипсов)
+function mkSelector(label, currentVal, options, onSelectStr) {
+    let html = `<div class="control-group">`;
+    if(label) html += `<label class="control-label">${label}</label>`;
+    
+    html += `<div class="chip-scroll">`;
+    
+    options.forEach(opt => {
+        // Проверяем, активна ли эта кнопка
+        const isActive = (opt.val === currentVal);
+        // Экранируем кавычки для JS вызова
+        const safeVal = opt.val.replace(/'/g, "\\'");
+        
+        html += `<button class="chip-btn ${isActive ? 'active' : ''}" 
+                         onclick="${onSelectStr.replace('__VAL__', safeVal)}">
+                    ${opt.icon ? `<span>${opt.icon}</span>` : ''}
+                    <span>${opt.label}</span>
+                 </button>`;
+    });
+    
+    html += `</div></div>`;
+    return html;
+}
 function mkStepper(lbl, val, onInp, onDec, onInc) {
     // ИСПРАВЛЕНИЕ: Экранируем кавычки, чтобы JS код внутри HTML не ломался
     // Было: startHold('stepProp('d', 10)') -> ОШИБКА
@@ -3562,6 +3640,7 @@ init();
 </script>
 </body>
 </html>
+
 
 
 
