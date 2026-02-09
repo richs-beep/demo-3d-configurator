@@ -3502,34 +3502,53 @@ function updateCakeGap(val) {
     // Камеру не меняем, чтобы не сбивать настройку, просто двигаем торты
 }
 
-  /* --- ЛОГИКА DRAG (ПЕРЕТАСКИВАНИЯ) ШТОРКИ --- */
+/* --- ИСПРАВЛЕННАЯ ЛОГИКА DRAG (УНИВЕРСАЛЬНАЯ) --- */
 const sheetEl = document.getElementById('bottom-sheet');
 const dragEl = document.getElementById('sheet-drag-handle');
 let dragStartY, dragStartH, isSheetDragging = false;
 
-dragEl.addEventListener('touchstart', (e) => {
+// Используем pointerdown вместо touchstart (работает и мышь, и палец)
+dragEl.addEventListener('pointerdown', (e) => {
+    // 1. Блокируем всплытие, чтобы не вращалась камера
+    e.stopPropagation(); 
+    
     isSheetDragging = true;
-    dragStartY = e.touches[0].clientY;
-    dragStartH = sheetEl.getBoundingClientRect().height;
-    sheetEl.style.transition = 'none'; // Убираем анимацию для мгновенного отклика
-}, {passive: false});
+    dragStartY = e.clientY; // Координата Y нажатия
+    dragStartH = sheetEl.getBoundingClientRect().height; // Текущая высота
+    
+    sheetEl.style.transition = 'none'; // Отключаем плавность для мгновенного отклика
+    
+    // 2. "Захват" курсора. События будут идти на этот элемент, даже если палец ушел в сторону
+    dragEl.setPointerCapture(e.pointerId);
+});
 
-document.addEventListener('touchmove', (e) => {
+dragEl.addEventListener('pointermove', (e) => {
     if (!isSheetDragging) return;
-    const delta = dragStartY - e.touches[0].clientY;
+    
+    // 3. Считаем разницу (тянем вверх = Y уменьшается, значит разница положительная для высоты)
+    const delta = dragStartY - e.clientY; 
     const newH = dragStartH + delta;
-    // Ограничиваем высоту (px)
-    if(newH > window.innerHeight * 0.95) return; 
-    if(newH < window.innerHeight * 0.15) return;
+    
+    // 4. Ограничители высоты (в пикселях)
+    const maxH = window.innerHeight * 0.95; // Не больше 95% экрана
+    const minH = window.innerHeight * 0.15; // Не меньше 15% экрана
+    
+    if(newH > maxH || newH < minH) return;
+    
     sheetEl.style.height = newH + 'px';
-}, {passive: false});
+});
 
-document.addEventListener('touchend', () => {
+// Завершение перетаскивания
+const stopDrag = (e) => {
     if (!isSheetDragging) return;
     isSheetDragging = false;
-    sheetEl.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'; 
-});
-  
+    // Возвращаем плавную анимацию
+    sheetEl.style.transition = 'height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'; 
+    dragEl.releasePointerCapture(e.pointerId);
+};
+
+dragEl.addEventListener('pointerup', stopDrag);
+dragEl.addEventListener('pointercancel', stopDrag);
 init();
 </script>
   <script>
@@ -3543,6 +3562,7 @@ init();
 </script>
 </body>
 </html>
+
 
 
 
