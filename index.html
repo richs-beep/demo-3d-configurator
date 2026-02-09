@@ -407,6 +407,36 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); 
     white-space: nowrap;
     transform: translate(-50%, -150%); /* Чтобы палец не закрывал цифры */
 }
+/* --- ИСПРАВЛЕНИЕ ДЛЯ СЕТКИ НА ТЕЛЕФОНАХ --- */
+@media (max-width: 800px) {
+    /* Внутри сетки делаем кнопки +/- поменьше, чтобы всё влезло в 2 колонки */
+    .control-grid-2 .stepper button {
+        width: 32px !important;  /* Было 50px, стало 32px */
+        height: 32px !important; /* Делаем их квадратными и аккуратными */
+        font-size: 18px !important; 
+        border-radius: 8px !important;
+    }
+    
+    /* Уменьшаем шрифт и отступы внутри поля ввода в сетке */
+    .control-grid-2 .stepper input {
+        height: 32px !important;
+        font-size: 14px !important;
+        padding: 0 !important;
+    }
+    
+    /* Саму высоту строки степпера тоже поджимаем */
+    .control-grid-2 .stepper {
+        height: 32px !important;
+        gap: 4px !important;
+    }
+
+    /* Чуть уменьшаем расстояние между колонками */
+    .control-grid-2 {
+        gap: 8px !important;
+    }
+}
+
+  
 </style>
 </head>
 <body>
@@ -3493,5 +3523,6 @@ init();
 </script>
 </body>
 </html>
+
 
 
