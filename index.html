@@ -1,0 +1,3494 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cake 3D Mobile Pro</title>
+<link rel="manifest" href="./manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* --- 1. GLOBAL STYLES --- */
+:root {
+  --primary: #ec4899; --primary-active: #db2777;
+  --bg-ui: rgba(255, 255, 255, 0.96);
+  --text: #1f2937; --border: #e5e7eb;
+  --safe-area-bottom: env(safe-area-inset-bottom, 20px);
+  --toolbar-h: 65px;
+}
+* { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+body { 
+  margin: 0; padding: 0; font-family: 'Inter', sans-serif; 
+  background: #f0f2f5; color: var(--text); overflow: hidden; 
+  touch-action: none; user-select: none;
+  overscroll-behavior: none; /* <--- БЛОКИРУЕТ ОБНОВЛЕНИЕ СВАЙПОМ */
+}
+
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+#app { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+#viewer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: radial-gradient(circle at center, #f8f9fa 0%, #eef2f6 100%); }
+
+/* --- 2. UI LAYER --- */
+#ui-layer { 
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; 
+  pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+}
+.pointer-events-auto { pointer-events: auto; }
+
+/* TOP BAR */
+/* ОБНОВЛЕННЫЙ ВЕРХНИЙ БАР */
+.top-bar { 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    padding: 10px; 
+    gap: 12px; /* Расстояние между переключателем и кнопками */
+    margin-top: 10px; 
+    flex-wrap: wrap; /* Чтобы на очень узких экранах переносилось */
+    pointer-events: none; /* Пропускаем клики сквозь пустое место */
+}
+
+/* ПАНЕЛЬ ВЫБОРА ТОРТА (Контейнер) */
+.cake-selector {
+    background: var(--bg-ui); /* Белый фон плашки */
+    border-radius: 24px;      /* Сильное скругление */
+    
+    /* Увеличили отступы, чтобы кнопки не прилипали к краю */
+    padding: 6px 8px;         
+    
+    display: flex;
+    align-items: center;
+    
+    /* Увеличили расстояние между кнопками, как на второй плашке */
+    gap: 8px;                 
+    
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    pointer-events: auto;
+    flex-shrink: 0;
+}
+/* КНОПКИ ВНУТРИ ПАНЕЛИ (A, B, A+B) */
+.seg-btn {
+    /* Делаем кнопки круглыми */
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    
+    /* Убираем старый фон и рамки */
+    background: transparent;
+    border: none;
+    
+    /* Центрируем текст */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    font-size: 14px; font-weight: bold; color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease; /* Плавность */
+}
+
+/* При наведении мыши - легкий серый фон */
+.seg-btn:hover {
+    background: #f3f4f6;
+}
+
+/* Активная кнопка - Розовая и круглая */
+.seg-btn.active {
+    background: #ec4899;
+    color: white;
+    box-shadow: 0 2px 5px rgba(236, 72, 153, 0.4);
+}
+
+.top-tools { 
+    /* Убрали position: absolute */
+    position: static; 
+    display: flex; 
+    gap: 8px; 
+    pointer-events: auto; 
+    
+    /* Добавили стиль "островка", как у переключателя */
+    background: var(--bg-ui);
+    padding: 4px 8px;
+    border-radius: 24px; /* Чуть более круглый для кнопок */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    align-items: center;
+}
+
+/* Кнопки внутри инструментов */
+.icon-btn {
+    width: 36px; /* Чуть компактнее */
+    height: 36px; 
+    border-radius: 50%; 
+    background: transparent; /* Фон теперь общий у панели */
+    border: none;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    font-size: 18px; 
+    box-shadow: none; /* Тень теперь у общей панели */
+}
+
+.icon-btn:active { 
+    transform: scale(0.9); 
+    background: #f3f4f6; 
+}
+
+/* Активная линейка */
+.icon-btn.active-tool {
+    background: #ec4899;
+    color: white;
+    box-shadow: 0 2px 5px rgba(236, 72, 153, 0.4);
+}
+
+/* COMPARE OVERLAY */
+#compare-overlay {
+  display: none; 
+  position: absolute; 
+  top: 70px;
+  left: 10px; 
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px; 
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border-left: 4px solid var(--primary);
+  max-width: 300px; 
+  font-size: 11px; 
+  color: #333; 
+  pointer-events: auto; /* ВАЖНО: auto, чтобы работала кнопка */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Анимация */
+  overflow: hidden;
+}
+
+/* СТИЛИ СВЕРНУТОГО СОСТОЯНИЯ */
+#compare-overlay.minimized {
+  width: 44px !important;      /* Узкая полоска */
+  max-height: 160px;
+  padding: 8px 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+#compare-overlay.minimized .cmp-header, 
+#compare-overlay.minimized .cmp-content {
+  opacity: 0;            /* Скрываем контент */
+  pointer-events: none;
+  display: none;         /* Убираем из потока */
+}
+
+#compare-overlay.minimized .cmp-title {
+  writing-mode: vertical-rl; /* Вертикальный текст */
+  text-orientation: mixed;
+  transform: rotate(180deg); /* Разворот, чтобы читалось снизу вверх */
+  white-space: nowrap;
+  margin: 30px auto 0;       /* Отступ сверху под кнопку */
+  text-align: center;
+  width: 100%;
+}
+
+/* КНОПКА СВОРАЧИВАНИЯ */
+.cmp-toggle-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#compare-overlay.minimized .cmp-toggle-btn {
+  right: 50%;
+  transform: translateX(50%); /* Центрируем кнопку в узкой полоске */
+}
+
+.cmp-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--primary); }
+.cmp-header { font-weight: 700; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 4px; display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center;}
+.cmp-tier { padding: 4px; background: #f9f9f9; border-radius: 4px; margin-bottom: 4px; }
+
+/* BOTTOM SHEET */
+.bottom-sheet {
+  position: absolute; bottom: 0; left: 0; width: 100%; max-height: 60vh;
+  background: var(--bg-ui); border-radius: 20px 20px 0 0; box-shadow: 0 -5px 30px rgba(0,0,0,0.15);
+  transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex; flex-direction: column; pointer-events: auto; z-index: 20;
+}
+.bottom-sheet.open { transform: translateY(0); }
+.sheet-header { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+.sheet-title { font-weight: 700; font-size: 16px; }
+.sheet-content { padding: 16px; overflow-y: auto; overflow-x: hidden; padding-bottom: 40px; }
+.back-btn { background: #f3f4f6; border: none; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: #333; }
+
+/* CONTROLS */
+.control-group { margin-bottom: 16px; }
+.control-label { font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700; margin-bottom: 6px; letter-spacing: px; }
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn-full { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.btn-sec { background: #fff; border: 1px solid #ddd; color: #333; padding: 10px; border-radius: 10px; font-weight: 600; width: 100%; text-align: left;}
+.stepper { display: flex; align-items: center; width: 100%; height: 44px; gap: 6px; }
+.stepper button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid #ddd; background: #fff; font-size: 18px; color: var(--primary); font-weight: bold; cursor: pointer; }
+.stepper button:active { background: var(--primary); color: #fff; }
+.stepper input { flex: 1; height: 44px; text-align: center; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; font-weight: 600; -moz-appearance: textfield; background: #fff;}
+.palette { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.swatch { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+select.btn-sec { -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4l128-128c3.6-3.6%205.4-7.8%205.4-12.8%200-5-1.8-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 10px; padding-right: 30px; }
+
+/* TABS & SUMMARY */
+.tab-switch { display: flex; background: #f3f4f6; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.tab-btn { flex: 1; border: none; background: none; padding: 8px; border-radius: 8px; font-weight: 600; color: #666; font-size: 13px; }
+.tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.tier-summary-box { background: #fff0f5; padding: 10px; border-radius: 8px; border: 1px solid #fecdd3; margin-bottom: 16px; font-size: 12px; color: #831843; line-height: 1.5; }
+input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary); }
+
+/* BOTTOM TOOLBAR */
+.toolbar {
+  height: calc(var(--toolbar-h) + var(--safe-area-bottom)); background: var(--bg-ui);
+  border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; align-items: flex-start;
+  padding-top: 8px; padding-bottom: var(--safe-area-bottom); pointer-events: auto; box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+  transition: transform 0.3s ease;
+}
+.toolbar.hidden { transform: translateY(100%); }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 60px; color: #6b7280; font-size: 10px; font-weight: 500; background: none; border: none; padding: 0; }
+.nav-icon { font-size: 24px; transition: 0.2s; }
+.nav-item.active { color: var(--primary); }
+
+@media (orientation: landscape) {
+  #ui-layer { flex-direction: row; }
+  .toolbar { width: 70px; height: 100%; flex-direction: column; justify-content: center; border-top: none; border-left: 1px solid #eee; order: 2; padding: 0; }
+  .toolbar.hidden { transform: translateX(100%); }
+  .bottom-sheet { left: auto; right: 0; bottom: 0; top: 0; width: 320px; height: 100%; max-height: 100%; border-radius: 0; border-left: 1px solid #eee; transform: translateX(110%); }
+  .bottom-sheet.open { transform: translateX(0); }
+  .top-bar { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: auto; }
+  .top-tools { top: 10px; right: 80px; }
+  #compare-overlay { left: 20px; top: 60px; }
+}
+/* --- МОБИЛЬНАЯ ОПТИМИЗАЦИЯ (Крупные кнопки снизу) --- */
+    @media (max-width: 800px) {
+        /* 1. Увеличиваем размер текста и полей внутри кнопок */
+        .btn-sec, .btn-full, select, input[type=text], input[type=number] {
+            font-size: 16px !important;       /* Крупный шрифт */
+            padding: 12px 8px !important;     /* Больше места для пальца */
+            min-height: 48px !important;      /* Стандарт Apple для тач-экранов */
+        }
+        
+        /* 2. Делаем кнопки +/- (в степперах) огромными и удобными */
+        .stepper button {
+            width: 50px !important;           /* Широкие кнопки минус/плюс */
+            font-size: 22px !important;       /* Крупный знак */
+        }
+
+        #bottom-sheet {
+            height: 30vh !important;      /* 30% от высоты экрана */
+            max-height: 30vh !important;  /* Не больше 30% */
+            min-height: 30vh !important;  /* Не меньше 30% */
+        }
+        
+        /* 3. Чуть увеличиваем заголовки полей */
+        .control-label {
+            font-size: 14px !important;
+            margin-bottom: 6px !important;
+            color: #333;
+        }
+
+        /* 4. КОМПАКТНОСТЬ: Чтобы большие кнопки влезли в тот же экран */
+        /* Уменьшаем пустые отступы между элементами */
+        .control-group {
+            margin-bottom: 12px !important;   /* Меньше дырок между блоками */
+        }
+        
+        /* Уменьшаем отступы в самом меню */
+        #sheet-content {
+            padding: 16px !important;
+            padding-bottom: 40px !important; /* Отступ снизу для скролла */
+        }
+
+        /* Делаем сетку кнопок плотнее */
+        .btn-grid {
+            gap: 8px !important;
+        }
+
+        /* Цветовые кружки делаем крупнее */
+        .swatch {
+            width: 40px !important;
+            height: 40px !important;
+        }
+    }
+    /* Метка размера (плавает поверх 3D) */
+/* Метка размера (плавает поверх 3D) */
+.measurement-label {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.85); /* Почти черный фон */
+    color: #ffffff;
+    
+    /* Крупный размер для чтения на ходу */
+    font-size: 24px; 
+    font-weight: 800; /* Очень жирный шрифт */
+    font-family: 'Inter', sans-serif;
+    
+    /* Отступы, чтобы цифрам было не тесно */
+    padding: 10px 18px;
+    border-radius: 50px; /* Овальная форма */
+    
+    /* Белая обводка для контраста, если фон торта темный */
+    border: 2px solid #ffffff; 
+    box-shadow: 0 4px 15px rgba(0,0,0,); /* Глубокая тень */
+    
+    pointer-events: none; /* Пропускает клики */
+    transform: translate(-50%, -50%);
+    display: none;
+    z-index: 9999; /* ГАРАНТИРОВАННО ПОВЕРХ ВСЕГО (даже меню) */
+    white-space: nowrap; /* Текст в одну строку */
+}
+.icon-btn.active-tool {
+    background: #ec4899;
+    color: white;
+    border-color: #ec4899;
+}
+/* Метка координат возле пальца */
+.drag-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 1000;
+    display: none;
+    white-space: nowrap;
+    transform: translate(-50%, -150%); /* Чтобы палец не закрывал цифры */
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="viewer"><div id="three-container" style="width:100%; height:100%"></div></div>
+  <div id="ui-layer">
+    <div id="drag-tooltip" class="drag-tooltip">X:0 Y:0</div>
+     <div id="measure-label" class="measurement-label">0 mm</div>
+    <div id="compare-overlay">
+     
+       <button class="cmp-toggle-btn" onclick="toggleCompare(event)">–</button>
+       
+       <div class="cmp-title" onclick="if(isCompareMinimized) toggleCompare(event)">Сравнение тортов</div>
+       
+       <div class="cmp-header"><div>Торт А</div><div>Торт Б</div></div>
+       <div class="cmp-content" id="cmp-content" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;"></div>
+    </div>
+
+    <div class="pointer-events-auto" style="position:relative; width:100%; height: 0;">
+      <div class="top-bar">
+        
+        <div class="cake-selector">
+          <button class="seg-btn active" id="seg-0" onclick="switchCake(0)">A</button>
+          <button class="seg-btn" id="seg-1" onclick="switchCake(1)">B</button>
+          <button class="seg-btn" id="seg-both" onclick="switchCake('both')">A+B</button>
+        </div>
+
+        <div class="top-tools">
+           <button class="icon-btn" id="btn-ruler" onclick="toggleRuler()">📏</button>
+           <button class="icon-btn" onclick="undo()">↩</button>
+           <button class="icon-btn" onclick="redo()">↪</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="bottom-sheet" class="bottom-sheet">
+       <div class="sheet-header">
+         <div class="sheet-title" id="sheet-title">⚙️ Настройки</div>
+         <button class="back-btn" onclick="closeSheet()">▼ Скрыть</button>
+       </div>
+       <div class="sheet-content" id="sheet-content"></div>
+    </div>
+
+    <div class="toolbar" id="main-toolbar">
+      <button class="nav-item" onclick="openMenu('structure')"><span class="nav-icon">🏗</span><span>Форма</span></button>
+      <button class="nav-item" onclick="openMenu('color')"><span class="nav-icon">🎨</span><span>Цвет</span></button>
+      <button class="nav-item" onclick="openMenu('decor')"><span class="nav-icon">✨</span><span>Декор</span></button>
+      <button class="nav-item" onclick="openMenu('scene')"><span class="nav-icon">📷</span><span>Вид</span></button>
+      <button class="nav-item" onclick="openMenu('project')"><span class="nav-icon">💾</span><span>Файл</span></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/USDZExporter.js"></script>
+
+<script>
+/* --- 1. CORE & INIT --- */
+let scene, camera, renderer, controls, group, raycaster, mouse;
+let tapStartX = 0, tapStartY = 0; // Запоминаем место касания
+// --- ПЕРЕМЕННЫЕ ДЛЯ МАГНИТА ---
+let snapLines = { x: null, z: null, y: null }; // Храним линии
+let isSnapped = { x: false, z: false }; // Чтобы не вибрировать постоянно
+const SNAP_DIST_3D = 8; // Дистанция прилипания в мм (для 3D)
+const SNAP_DIST_SIDE = 0.03; // Дистанция для стикеров (0.0-1.0)
+let isDragging = false, dragData = null;
+let cakes = [[], []]; 
+let activeCakeId = 0; let viewMode = 'single';
+// --- STATE ПЕРЕМЕННЫЕ ---
+let ui = { selTier: null, selDecorIdx: null, activeMenu: null, colorTab: 'solid', activeTexPart: 'side', lockAspect: true };
+// НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ МУЛЬТИ-ВЫБОРА:
+let isMultiSelect = false;
+let selectedDecors = []; // Массив индексов [0, 2, 5]
+let history = [], historyPtr = -1;
+let cakeGap = 220; // <--- ДОБАВИТЬ ВОТ ЭТУ ПЕРЕМЕННУЮ (Стандартное расстояние)
+const texLoader = new THREE.TextureLoader();
+const STORAGE_KEY = 'cake_mobile_autosave_v2';
+const defaultTex = () => ({ url:null, mode:'tile', scale:1, repX:1, repY:1, offX:0, offY:0, rot:0, mixColor:false });
+/* --- FONTS CONFIG --- */
+
+/* --- FONTS CONFIG --- */
+/* --- FONTS CONFIG --- */
+const GFONTS = [
+    
+    // --- БАЗОВЫЕ ---
+    {n:'Inter', f:'Inter'},
+    {n:'Roboto', f:'Roboto'},
+    {n:'Playfair', f:'"Playfair Display"'},
+    {n:'Oswald', f:'Oswald'}
+];
+
+
+// Функция принудительной загрузки шрифта (ХАК СО SPAN)
+function loadFont(f) {
+    if(!f) return;
+    const cf = f.replace(/['"]/g, ""); // Убираем кавычки для URL
+    
+    // 1. Добавляем ссылку CSS
+    const l = document.createElement('link');
+    l.href = "https://fonts.googleapis.com/css?family=' + cf.replace(/ /g, '+') + '&display=swap";
+    l.rel = 'stylesheet';
+    document.head.appendChild(l);
+
+    // 2. Создаем невидимый элемент с этим шрифтом, чтобы браузер начал рендеринг
+    const t = document.createElement('span');
+    t.style.fontFamily = f; 
+    t.style.opacity = '0'; 
+    t.style.position = 'absolute';
+    t.style.top = '-9999px';
+    t.textContent = 'font_test';
+    document.body.appendChild(t); 
+    
+    // Удаляем мусор через 2 секунды
+    setTimeout(() => { if(t.parentNode) document.body.removeChild(t); }, 2000);
+}
+
+// Предзагрузка всех шрифтов при старте
+function preloadAllFonts() {
+    GFONTS.forEach(font => loadFont(font.f));
+}
+
+function init() {
+  preloadAllFonts(); // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+  const el = document.getElementById('three-container');
+  scene = new THREE.Scene(); 
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4)); // Делаем сцену светлее
+  const dl = new THREE.DirectionalLight(0xffffff, 0.8); 
+  dl.position.set(300, 700, 300); // Сверху справа
+  dl.castShadow = true;
+  dl.shadow.camera.left = -1000;
+  dl.shadow.camera.right = 1000;
+  dl.shadow.camera.top = 1000;
+  dl.shadow.camera.near = 10;
+  dl.shadow.camera.far = 3000;
+  dl.shadow.camera.bottom = -1000;
+  dl.shadow.mapSize.width = 2048;
+  dl.shadow.mapSize.height = 2048;
+  dl.shadow.bias = -0.001;
+  scene.add(dl);
+  
+  camera = new THREE.PerspectiveCamera(45, el.clientWidth/el.clientHeight, 1, 8000); 
+  camera.position.set(0, 400, 700); 
+  
+  renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+  renderer.shadowMap.autoUpdate = false; // Замораживаем тени
+  renderer.setSize(el.clientWidth, el.clientHeight); 
+  renderer.outputEncoding = THREE.sRGBEncoding; 
+  renderer.setPixelRatio(window.devicePixelRatio);
+  el.appendChild(renderer.domElement);
+  
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  
+  // РАЗРЕШАЕМ СДВИГ
+  controls.enablePan = true;
+  controls.screenSpacePanning = true; // <--- ВАЖНО: Сдвиг будет как на 2D холсте (вверх-вниз-влево-вправо)
+
+  // НАСТРОЙКА ЖЕСТОВ
+  controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,      // 1 палец: Вращение
+      TWO: THREE.TOUCH.DOLLY_PAN    // 2 пальца: Зум + Сдвиг
+  };
+
+  controls.minDistance = 150;
+  controls.maxDistance = 2000;
+  controls.maxPolarAngle = Math.PI / 2;
+
+  // --- СКОРОСТЬ ---
+  // Если на телефоне двигается слишком медленно, увеличьте это число (например, до 1.0 или 1.5)
+  if (window.innerWidth < 900) {
+      controls.panSpeed = 0.7;   // Скорость сдвига (было 0.5, поставил 1.0 для резвости)
+      controls.rotateSpeed = 0.6; // Скорость вращения
+      controls.dampingFactor = 0.07; 
+  }
+  
+  group = new THREE.Group(); scene.add(group);
+  raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+  el.addEventListener('pointerdown', onPointerDown); 
+  window.addEventListener('resize', onWindowResize);
+  
+  const saved = localStorage.getItem(STORAGE_KEY);
+  let restored = false;
+  if (saved) {
+      if(confirm('Найдена несохраненная версия проекта. Восстановить?')) {
+          try {
+              const data = JSON.parse(saved);
+              if(data && data.cakes) { cakes = data.cakes; restored = true; }
+          } catch(e) { console.error(e); }
+      }
+  }
+  
+  if(!restored && cakes[0].length === 0) {
+      cakes[0].push({id:Date.now(), shape:'cylinder', d:200, h:100, n:6, w:200, dep:200, color:'#ffffff', weight:2, filling:'Ваниль', tex:{side:defaultTex(), top:defaultTex(), bottom:defaultTex()}, decor:[]});
+      ui.selTier = 0;
+  }
+  
+  rebuildScene(); 
+  recordHistory(); 
+  animate();
+  
+  setInterval(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify({cakes: cakes, date: Date.now()})); }, 60000);
+  setInterval(() => { const name = prompt("Автосохранение (15 мин). Введите имя файла для скачивания:", "cake_autosave"); if(name) saveProject(name); }, 900000);
+
+
+  // Создаем невидимый пол для теней
+  const floorGeo = new THREE.PlaneGeometry(5000, 5000);
+  const floorMat = new THREE.ShadowMaterial({ opacity: 0.15 }); // Ловит только тени, сам прозрачный
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -5; // Чуть ниже самой нижней подложки
+  floor.receiveShadow = true; // РАЗРЕШАЕМ принимать тени
+  scene.add(floor);
+}
+
+function onWindowResize() {
+    const el = document.getElementById('three-container');
+    camera.aspect = el.clientWidth / el.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(el.clientWidth, el.clientHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    // --- ЛОГИКА "РЕЛЬС" (Обновлено с учетом cakeGap) ---
+    if (viewMode === 'single') {
+        // Теперь используем переменную cakeGap, а не 220
+        const lockedX = (activeCakeId === 0) ? -cakeGap : cakeGap;
+        
+        controls.target.x = lockedX; 
+        controls.target.z = 0;       
+    }
+
+    if (controls.target.y < 0) controls.target.y = 0;
+    if (controls.target.y > 1000) controls.target.y = 1000;
+
+    controls.update();
+    
+    if (rulerMode) updateMeasureLabel();
+    renderer.render(scene, camera);
+}
+
+/* --- 2. SCENE LOGIC --- */
+function fixExtrudedGeometry(geo) {
+  geo.computeBoundingBox(); const box=geo.boundingBox; const size=new THREE.Vector3(); box.getSize(size);
+  const pos=geo.attributes.position, norm=geo.attributes.normal, uvs=geo.attributes.uv;
+  const grpS=[], grpT=[], grpB=[]; const p=new THREE.Vector3(), n=new THREE.Vector3();
+  for(let i=0;i<pos.count;i+=3) {
+    n.fromBufferAttribute(norm, i);
+    if(n.y>0.9) { grpT.push(i,i+1,i+2); for(let k=0;k<3;k++){p.fromBufferAttribute(pos,i+k); uvs.setXY(i+k, (p.x-box.min.x)/size.x, 1-(p.z-box.min.z)/size.z);} } 
+    else if(n.y<-0.9) { grpB.push(i,i+1,i+2); for(let k=0;k<3;k++){p.fromBufferAttribute(pos,i+k); uvs.setXY(i+k, (p.x-box.min.x)/size.x, (p.z-box.min.z)/size.z);} } 
+    else { grpS.push(i,i+1,i+2); for(let k=0;k<3;k++){p.fromBufferAttribute(pos,i+k); const ang=Math.atan2(p.z,p.x); uvs.setXY(i+k, (ang+Math.PI)/(2*Math.PI), (p.y-box.min.y)/size.y);} }
+  }
+  const idx=[]; geo.clearGroups();
+  geo.addGroup(idx.length, grpS.length, 0); idx.push(...grpS); geo.addGroup(idx.length, grpT.length, 1); idx.push(...grpT);
+  geo.addGroup(idx.length, grpB.length, 2); idx.push(...grpB); geo.setIndex(idx); return geo;
+}
+
+function createHeartGeo(r, h) {
+  const shape = new THREE.Shape(); const x = 0, y = 0;
+  shape.moveTo(x + 0.5*r, y + 0.5*r); shape.bezierCurveTo(x + 0.5*r, y + 0.5*r, x + 0.4*r, y, x, y);
+  shape.bezierCurveTo(x - 0.6*r, y, x - 0.6*r, y + 0.7*r, x - 0.6*r, y + 0.7*r);
+  shape.bezierCurveTo(x - 0.6*r, y + 1.1*r, x - 0.3*r, y + 1.54*r, x + 0.5*r, y + 1.9*r);
+  shape.bezierCurveTo(x + 1.2*r, y + 1.54*r, x + 1.6*r, y + 1.1*r, x + 1.6*r, y + 0.7*r);
+  shape.bezierCurveTo(x + 1.6*r, y + 0.7*r, x + 1.6*r, y, x + 1.0*r, y); shape.bezierCurveTo(x + 0.7*r, y, x + 0.5*r, y + 0.5*r, x + 0.5*r, y + 0.5*r);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false }); geo.center(); geo.rotateX(Math.PI/2); return geo;
+}
+
+function createStarGeo(r, h) {
+  const shape = new THREE.Shape(); const points = 5; const startAng = -Math.PI / 2; 
+  for (let i = 0; i < points * 2; i++) {
+    const ang = startAng + (i / (points * 2)) * Math.PI * 2; const rad = (i % 2 === 0) ? r : r * 0.5; 
+    const x = Math.cos(ang) * rad; const y = Math.sin(ang) * rad;
+    if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+  }
+  shape.closePath(); const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.center(); geo.rotateX(Math.PI/2); geo.rotateY(Math.PI); return geo;
+}
+
+function createLabelTexture(letter) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath(); ctx.arc(64, 64, 55, 0, Math.PI*2); ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = '#ec4899'; ctx.stroke();
+    ctx.fillStyle = '#ec4899'; ctx.font = 'bold 80px Inter, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(letter, 64, 68);
+    return new THREE.CanvasTexture(canvas);
+}
+
+function rebuildScene() {
+  while(group.children.length) group.remove(group.children[0]);
+
+  cakes.forEach((tiers, cIdx) => {
+    if(viewMode === 'single' && cIdx !== activeCakeId) return;
+    
+    // <--- ИСПРАВЛЕНО: Теперь используем переменную cakeGap, а не 220
+    const offsetX = (cIdx === 0) ? -cakeGap : cakeGap; 
+    
+    const cakeGroup = new THREE.Group(); 
+    cakeGroup.position.set(offsetX, 0, 0);
+    
+    // LABEL A/B (Сдвигаем букву тоже)
+    const labelTex = createLabelTexture(cIdx === 0 ? 'A' : 'B');
+    const labelMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80), 
+      new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, side: THREE.DoubleSide })
+    );
+    labelMesh.rotation.x = -Math.PI / 2; 
+    // Буква висит чуть спереди (Z=220 можно оставить или тоже привязать к размеру, но пока оставим)
+    labelMesh.position.set(0, 0.5, 220); 
+    cakeGroup.add(labelMesh);
+
+    let curY = 0;
+    tiers.forEach((t, idx) => {
+      let geo;
+      if(t.shape==='cylinder') geo=new THREE.CylinderGeometry(t.d/2,t.d/2,t.h,32);
+      else if(t.shape==='box') geo=new THREE.BoxGeometry(t.d,t.h,t.d);
+      else if(t.shape==='parallelepiped') geo=new THREE.BoxGeometry(t.w,t.h,t.dep);
+      else if(t.shape==='sphere') geo=new THREE.SphereGeometry(t.d/2,32,16);
+      else if(t.shape==='ngon') geo=new THREE.CylinderGeometry(t.d/2,t.d/2,t.h,t.n || 6);
+      else if(t.shape==='heart') geo=fixExtrudedGeometry(createHeartGeo(t.d/2, t.h));
+      else if(t.shape==='star') geo=fixExtrudedGeometry(createStarGeo(t.d/2, t.h));
+
+      // LAYER 1: BASE MATERIAL
+      let baseMat;
+      const mType = t.coating || 'cream';
+      const matProps = { color: t.color };
+      
+      if (mType === 'velvet') {
+          Object.assign(matProps, { roughness: 0.9, bumpMap: NOISE_TEX, bumpScale: 1.0 });
+      } else if (mType === 'mirror') {
+          Object.assign(matProps, { roughness: 0.1, metalness: 0.3 });
+      } else if (mType === 'mastic') {
+          Object.assign(matProps, { roughness: 0.5, metalness: 0.0 });
+      } else {
+          Object.assign(matProps, { roughness: 0.6, bumpMap: NOISE_TEX, bumpScale: 0.2 });
+      }
+      baseMat = new THREE.MeshStandardMaterial(matProps);
+      
+      const baseMesh = new THREE.Mesh(geo, baseMat);
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      
+      const h = (t.shape==='sphere') ? t.d : t.h;
+      baseMesh.position.y = h/2; 
+      baseMesh.rotation.y = (t.rot || 0) * Math.PI / 180;
+      baseMesh.userData = { tIdx:idx, cIdx: cIdx, type:'tier' };
+      
+      const tGrp = new THREE.Group(); 
+      tGrp.add(baseMesh);
+
+      // BOARD
+      if (idx === 0 && t.board && t.board.enabled) {
+          const b = t.board;
+          const off = b.offset || 0;
+          const th = b.thickness || 3;
+          const forceRound = (b.isRound !== false);
+          const matSurface = new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.4, metalness: 0.1 });
+          const matEdge = new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.8 });
+          let bGeo;
+          let bMaterials;
+
+          if (forceRound) {
+              let r = t.d / 2;
+              if (t.shape === 'parallelepiped') r = Math.max(t.w, t.dep) / 2;
+              else if (t.shape === 'box') r = (t.d * Math.sqrt(2)) / 2;
+              bGeo = new THREE.CylinderGeometry(r + off/2, r + off/2, th,32);
+              bMaterials = [matEdge, matSurface, matEdge];
+          } else {
+              if (t.shape === 'box') bGeo = new THREE.BoxGeometry(t.d + off, th, t.d + off);
+              else if (t.shape === 'parallelepiped') bGeo = new THREE.BoxGeometry(t.w + off, th, t.dep + off);
+              else if (t.shape === 'heart') bGeo = fixExtrudedGeometry(createHeartGeo((t.d + off)/2, th));
+              else if (t.shape === 'star') bGeo = fixExtrudedGeometry(createStarGeo((t.d + off)/2, th));
+              else if (t.shape === 'ngon') bGeo = new THREE.CylinderGeometry((t.d + off)/2, (t.d + off)/2, th, t.n || 6);
+              else bGeo = new THREE.CylinderGeometry((t.d + off)/2, (t.d + off)/2, th, 32);
+              bMaterials = (bGeo.type === 'BoxGeometry') ? [matEdge, matEdge, matSurface, matEdge, matEdge, matEdge] : [matEdge, matSurface, matEdge];
+          }
+          const bMesh = new THREE.Mesh(bGeo, bMaterials);
+          bMesh.receiveShadow = true;
+          bMesh.castShadow = true;
+          bMesh.position.y = -th / 2;
+          bMesh.rotation.y = (t.rot || 0) * Math.PI / 180;
+          tGrp.add(bMesh);
+      }
+
+      // DRIPS
+      if (t.drips && t.drips.enabled) {
+          const dripsMesh = createDrips(t.shape, (t.shape==='box')?t.d:(t.shape==='parallelepiped'?t.w:t.d/2), (t.shape==='box')?t.d:t.dep, t.drips.color||'#3e2723', t.drips.len, t.drips.freq);
+          dripsMesh.position.y = h; tGrp.add(dripsMesh);
+      }
+
+      // TEXTURES
+      if (t.tex && (t.tex.side.url || t.tex.top.url || t.tex.bottom.url)) {
+          const getTexMat = (p) => {
+              const d = t.tex[p];
+              if(d && d.url) {
+                  const m = texLoader.load(d.url); m.encoding = THREE.sRGBEncoding; const s = d.scale || 1;
+                  m.center.set(0.5, 0.5); m.rotation = (d.rot || 0) * Math.PI / 180;
+                  if(d.mode === 'fit') { m.wrapS = m.wrapT = THREE.ClampToEdgeWrapping; m.repeat.set(1/s, 1/s); m.offset.set(0.5 - 0.5/s + (d.offX||0), 0.5 - 0.5/s + (d.offY||0)); } 
+                  else { m.wrapS = m.wrapT = THREE.RepeatWrapping; m.repeat.set((d.repX||1)/s, (d.repY||1)/s); m.offset.set(d.offX||0, d.offY||0); }
+                  return new THREE.MeshStandardMaterial({ color: d.mixColor ? t.color : 0xffffff, map: m, transparent: true, roughness: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
+              }
+              return new THREE.MeshBasicMaterial({visible: false});
+          };
+          let texMats;
+          if(t.shape==='box'||t.shape==='parallelepiped') { const s = getTexMat('side'); texMats = [s, s, getTexMat('top'), getTexMat('bottom'), s, s]; } 
+          else if(t.shape==='sphere') { texMats = getTexMat('side'); } 
+          else { texMats = [getTexMat('side'), getTexMat('top'), getTexMat('bottom')]; }
+          const texMesh = new THREE.Mesh(geo, texMats);
+          texMesh.position.copy(baseMesh.position); texMesh.rotation.copy(baseMesh.rotation);
+          texMesh.scale.set(1.001, 1.001, 1.001);
+          texMesh.userData = { tIdx:idx, cIdx: cIdx, type:'tier' }; tGrp.add(texMesh);
+      }
+      
+      // DECORS
+      t.decor.forEach((s, si) => {
+          if(!s.url) return;
+          const isSel = (ui.selTier === idx && activeCakeId === cIdx) && 
+                        ( (ui.selDecorIdx === si && !isMultiSelect) || (isMultiSelect && selectedDecors.includes(si)) );
+          let dMesh;
+          let tex = null;
+          if (s.url !== '3d_prim') {
+              tex = texLoader.load(s.url);
+          }
+          
+          const matParams = { 
+            map: tex, 
+            transparent: true, 
+            alphaTest: 0.4,
+            color: s.tintColor || '#ffffff' 
+          };
+
+          if (s.placement === 'volume') {
+              let vGeo;
+              if (s.shape === 'sphere') vGeo = new THREE.SphereGeometry(s.w / 2, 24, 24);
+              else if (s.shape === 'cube') vGeo = new THREE.BoxGeometry(s.w, s.h, s.w);
+              else if (s.shape === 'cylinder') vGeo = new THREE.CylinderGeometry(s.w / 2, s.w / 2, s.h, 24);
+              else vGeo = new THREE.BoxGeometry(s.w, s.h, s.w);
+
+              const vMat = new THREE.MeshStandardMaterial({ 
+                  color: s.color || 0xffffff, 
+                  roughness: 0.4, 
+                  metalness: 0.1,
+                  flatShading: false 
+              });
+              
+              dMesh = new THREE.Mesh(vGeo, vMat);
+              dMesh.castShadow = true;
+              dMesh.receiveShadow = true;
+              dMesh.position.set(s.x || 0, curY + h + (s.h / 2) + (s.y || 0), s.z || 0);
+              dMesh.rotation.order = 'YXZ';
+              dMesh.rotation.y = (s.rot || 0) * Math.PI / 180;
+              dMesh.rotation.x = (s.rotX || 0) * Math.PI / 180; 
+              dMesh.rotation.z = (s.rotZ || 0) * Math.PI / 180;
+              
+              dMesh.userData = { tIdx:idx, dIdx:si, cIdx:cIdx, type:'decor' };
+              if(isSel) dMesh.add(new THREE.BoxHelper(dMesh, 0xec4899));
+              tGrp.add(dMesh);
+              return; 
+          }
+          if (s.placement === 'topper') {
+              tex.center.set(0.5, 0.5); tex.repeat.set(1, 1);
+              const dGeo = new THREE.BoxGeometry(s.w, s.h, 3);
+              const uv = dGeo.attributes.uv; const normal = dGeo.attributes.normal;
+              for (let i = 0; i < normal.count; i++) {
+                  if (normal.getZ(i) < -0.5) uv.setX(i, 1 - uv.getX(i));
+              }
+              uv.needsUpdate = true; 
+              const matTrans = new THREE.MeshBasicMaterial({transparent:true, opacity:0});
+              const matFace = new THREE.MeshBasicMaterial({...matParams, map: tex, side: THREE.FrontSide});
+              dMesh = new THREE.Mesh(dGeo, [matTrans, matTrans, matTrans, matTrans, matFace, matFace]);
+              dMesh.position.set(s.x || 0, curY + h + (s.h/2) - 5 + (s.y || 0), s.z || 0);
+              dMesh.rotation.order = 'YXZ'; 
+              dMesh.rotation.y = -(s.rot || 0) * Math.PI / 180; 
+              dMesh.rotation.x = (s.rotX || 0) * Math.PI / 180; 
+              dMesh.rotation.z = (s.rotZ || 0) * Math.PI / 180; 
+          }
+          else if (s.placement === 'top') {
+              dMesh = new THREE.Mesh(new THREE.PlaneGeometry(s.w, s.h), new THREE.MeshBasicMaterial({...matParams, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+              dMesh.rotation.x = -Math.PI / 2; dMesh.rotation.z = -(s.rot || 0) * Math.PI / 180;
+              dMesh.position.set(s.x || 0, curY + h + 0.2 + (s.y || 0), s.z || 0);
+          } else {
+              const isBox = (t.shape === 'box' || t.shape === 'parallelepiped');
+              const baseRadius = (t.shape==='parallelepiped' ? t.dep : t.d) / 2;
+              const depthOffset = baseRadius + 0.6 + (s.z || 0);
+              let dGeo;
+              if (isBox) {
+                  dGeo = new THREE.PlaneGeometry(s.w, s.h);
+                  const width = (t.shape === 'box' ? t.d : t.w);
+                  const depth = (t.shape === 'box' ? t.d : t.dep);
+                  const perimeter = (width + depth) * 2;
+                  let dist = (s.x || 0) * perimeter;
+                  dMesh = new THREE.Mesh(dGeo, new THREE.MeshBasicMaterial({...matParams, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+                  
+                  if (dist < width) {
+                      dMesh.position.set(dist - width/2, 0, depth/2 + (s.z || 0.6)); dMesh.rotation.y = 0;
+                  } else if (dist < width + depth) {
+                      dMesh.position.set(width/2 + (s.z || 0.6), 0, depth/2 - (dist - width)); dMesh.rotation.y = Math.PI / 2;
+                  } else if (dist < width * 2 + depth) {
+                      dMesh.position.set(width/2 - (dist - (width + depth)), 0, -depth/2 - (s.z || 0.6)); dMesh.rotation.y = Math.PI;
+                  } else {
+                      dMesh.position.set(-width/2 - (s.z || 0.6), 0, -depth/2 + (dist - (width * 2 + depth))); dMesh.rotation.y = -Math.PI / 2;
+                  }
+              } else {
+                  const r = depthOffset; const arcLength = s.w / r;
+                  dGeo = new THREE.CylinderGeometry(r, r, s.h, 32, 1, true, -arcLength/2, arcLength);
+                  dMesh = new THREE.Mesh(dGeo, new THREE.MeshBasicMaterial({...matParams, side:THREE.DoubleSide, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+                  dMesh.rotation.y = (s.x || 0) * Math.PI * 2 + Math.PI;
+              }
+              dMesh.position.y = curY + (s.y!==undefined ? s.y : 0.5) * h;
+          }
+
+          dMesh.userData = { tIdx:idx, dIdx:si, cIdx:cIdx, type:'decor' };
+          if(isSel) dMesh.add(new THREE.BoxHelper(dMesh, 0xec4899));
+          tGrp.add(dMesh);
+      });
+
+      // SELECTION HIGHLIGHT
+      if(ui.selTier===idx && activeCakeId === cIdx) { 
+          const isSmooth = ['sphere','cylinder','ngon'].includes(t.shape);
+          const selGeo = isSmooth ? geo : new THREE.EdgesGeometry(geo);
+          const selMat = isSmooth ? new THREE.MeshBasicMaterial({color:0xec4899, wireframe:true, transparent:true, opacity:0.1}) : new THREE.LineBasicMaterial({color:0xec4899});
+          const sel = isSmooth ? new THREE.Mesh(selGeo, selMat) : new THREE.LineSegments(selGeo, selMat);
+          sel.position.y = h/2; sel.rotation.y = baseMesh.rotation.y; 
+          if(isSmooth) sel.scale.set(1.03, 1.03, 1.03); tGrp.add(sel);
+      }
+
+      // INFO LABELS
+      const infoLabel = createInfoSprite(t);
+      const dir = (cIdx === 0) ? -1 : 1;
+      let rMax = t.d/2;
+      if(t.shape==='box') rMax = (t.d * Math.sqrt(2))/2;
+      if(t.shape==='parallelepiped') rMax = Math.max(t.w, t.dep)/2;
+      infoLabel.position.set(dir * (rMax + 160), h/2, 0);
+      tGrp.add(infoLabel);
+      
+      tGrp.position.y = curY;
+      cakeGroup.add(tGrp); 
+      curY += h;
+    });
+    group.add(cakeGroup);
+  });
+}
+
+/* --- 3. UI GENERATION --- */
+function openMenu(menuName, scrollTarget) {
+    // --- 1. ЗАПОМИНАЕМ ТЕКУЩИЙ СКРОЛЛ (ЧТОБЫ НЕ СКАКАЛО) ---
+    let savedScroll = 0;
+    let wasDecorListOpen = false;
+    const oldList = document.getElementById('decor-list-box');
+    
+    // Если список декора уже открыт, запоминаем, где мы находились
+    if (oldList) {
+        savedScroll = oldList.scrollTop;
+        wasDecorListOpen = true;
+    }
+    // -------------------------------------------------------
+
+    ui.activeMenu = menuName;
+    const sheet = document.getElementById('bottom-sheet');
+    const content = document.getElementById('sheet-content');
+    const title = document.getElementById('sheet-title');
+    let html = '';
+  
+    if (menuName === 'structure' && ui.selTier !== null) {
+        menuName = 'structure_edit';
+    }
+    if (menuName === 'structure') {
+        title.innerHTML = '🏗 Структура';
+        html += `<button class="btn-full" onclick="actionAddTier()">+ Добавить Ярус</button>`;
+        const targetName = (activeCakeId === 0) ? 'B' : 'A';
+        html += `<button class="btn-sec" style="margin-top:10px; width:100%" onclick="copyCakeToOther()">📋 Скопировать в Торт ${targetName}</button>`;
+        if(getActiveTiers().length > 0) {
+             html += `<div class="control-label" style="margin-top:16px">Редактировать ярус:</div>`;
+             getActiveTiers().forEach((t, i) => {
+                 html += `<button class="btn-sec" style="margin-bottom:6px" onclick="selectAndEditTier(${i})">Ярус ${i+1} (${getShapeName(t.shape)})</button>`;
+             });
+        }
+    } else if (menuName === 'structure_edit') {
+        const tiers = getActiveTiers();
+        
+        // Если ярус не выбран ИЛИ индекс сломался -> выкидываем в главное меню
+        if (ui.selTier === null || !tiers[ui.selTier]) {
+            openMenu('structure'); // Переключаем на общий список
+            return; // Останавливаем выполнение, чтобы не было ошибки
+        }
+        
+        const t = tiers[ui.selTier];
+        title.innerHTML = `Настройка Яруса ${ui.selTier+1}`;
+        
+        const dimStr = (t.shape==='box') ? `${t.d/10}x${t.d/10}` : (t.shape==='parallelepiped' ? `${t.w/10}x${t.dep/10}` : `Ø${t.d/10}`);
+        const hStr = (t.shape==='sphere') ? `${t.d/10}` : `${t.h/10}`;
+        html += `<div class="tier-summary-box"><strong>Инфо:</strong> ${dimStr} см | h ${hStr} см<br>⚖️ ${t.weight || 0} кг | 🎂 ${t.filling || 'Без начинки'}</div>`;
+
+        html += `<div class="control-group"><label class="control-label">Позиция</label><div class="btn-grid"><button class="btn-sec" onclick="moveTier(1)">▲ Вверх</button><button class="btn-sec" onclick="moveTier(-1)">▼ Вниз</button></div></div>`;
+        html += `<div class="control-group"><label class="control-label">Форма</label>
+                 <select class="btn-sec" style="width:100%" onchange="updateTierProp('shape', this.value)">
+                    <option value="cylinder" ${t.shape=='cylinder'?'selected':''}>Цилиндр</option><option value="box" ${t.shape=='box'?'selected':''}>Куб</option><option value="parallelepiped" ${t.shape=='parallelepiped'?'selected':''}>Параллелепипед</option><option value="sphere" ${t.shape=='sphere'?'selected':''}>Шар</option><option value="ngon" ${t.shape=='ngon'?'selected':''}>Многоугольник</option><option value="heart" ${t.shape=='heart'?'selected':''}>Сердце</option><option value="star" ${t.shape=='star'?'selected':''}>Звезда</option>
+                 </select></div>`;
+                 
+        if(t.shape === 'parallelepiped') { 
+            html += mkStepper('Ширина', t.w || 200, "updateTierProp('w', this.value)", "stepProp('w', -1)", "stepProp('w', 1)"); 
+            html += mkStepper('Глубина', t.dep || 200, "updateTierProp('dep', this.value)", "stepProp('dep', -1)", "stepProp('dep', 1)"); 
+        } else { 
+            html += mkStepper('Размер/Диаметр', t.d, "updateTierProp('d', this.value)", "stepProp('d', -1)", "stepProp('d', 1)"); 
+        }
+        if(t.shape !== 'sphere') html += mkStepper('Высота', t.h, "updateTierProp('h', this.value)", "stepProp('h', -1)", "stepProp('h', 1)");
+        if(t.shape === 'ngon') html += mkStepper('Кол-во углов', t.n || 6, "updateTierProp('n', this.value)", "stepProp('n', -1)", "stepProp('n', 1)");
+        
+        html += `<div class="control-group"><label class="control-label">Вес (кг)</label><div class="stepper"><button onclick="stepProp('weight', -0.1)">-</button><input type="number" value="${t.weight||0}" step="0.1" oninput="updateTierProp('weight', this.value)"><button onclick="stepProp('weight', 0.1)">+</button></div></div>`;
+        html += `<div class="control-group"><label class="control-label">Начинка</label><input type="text" class="btn-sec" style="width:100%" value="${t.filling||''}" onchange="updateTierProp('filling', this.value)"></div>`;
+        // --- ВСТАВИТЬ ЭТОТ БЛОК (НАСТРОЙКИ ПОДЛОЖКИ) ---
+        // Показываем настройки подложки только для нижнего яруса (index 0)
+        if (ui.selTier === 0) {
+            const b = t.board || { enabled: false, color: '#FFD700', thickness: 3, offset: 20 };
+            
+            html += `<hr style="border:0; border-top:1px solid #eee; margin:16px 0">`;
+            html += `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px">
+                        <label class="control-label" style="margin:0">🥯 Подложка</label>
+                        <input type="checkbox" ${b.enabled ? 'checked' : ''} 
+                               onchange="toggleBoard(this.checked)" style="width:20px; height:20px; accent-color:#ec4899">
+                     </div>`;
+            
+            if (b.enabled) {
+                html += `<div style="background:#fff; padding:10px; border-radius:10px; border:1px solid #ddd">
+                            
+                            <div style="display:flex; align-items:center; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #eee">
+                                <input type="checkbox" id="board-round" ${(b.isRound!==false)?'checked':''} 
+                                       onchange="updateBoardProp('isRound', this.checked)"
+                                       style="width:18px; height:18px; accent-color:#ec4899">
+                                <label for="board-round" style="margin-left:8px; font-weight:600; font-size:13px; color:#333">
+                                    Всегда круглая
+                                </label>
+                            </div>
+
+                            <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center">
+                                <input type="color" value="${b.color}" onchange="updateBoardProp('color', this.value)" style="border:none; width:40px; height:30px">
+                                <span style="font-size:12px">Цвет подложки</span>
+                            </div>
+                            
+                            ${mkStepper('Толщина (мм)', b.thickness, 
+                                "updateBoardProp('thickness', this.value)", 
+                                "stepBoardProp('thickness', -1)", 
+                                "stepBoardProp('thickness', 1)")}
+                                
+                            ${mkStepper('Увеличить размер (мм)', b.offset, 
+                                "updateBoardProp('offset', this.value)", 
+                                "stepBoardProp('offset', -5)", 
+                                "stepBoardProp('offset', 5)")}
+                         </div>`;
+            }
+        }
+        // --- КОНЕЦ БЛОКА ---
+        html += `<div class="btn-grid" style="margin-top:20px"><button class="btn-sec" onclick="duplicateTier()">Копия</button><button class="btn-sec" style="color:red; border-color:red" onclick="removeTier()">Удалить</button></div>`;
+                 
+    } else if (menuName === 'color') {
+        if(ui.selTier === null) html = '<p style="color:#999; text-align:center">Выберите ярус</p>';
+        else {
+            const t = getActiveTiers()[ui.selTier];
+            title.innerHTML = '🎨 Оформление';
+            html += `<div class="tab-switch"><button class="tab-btn ${ui.colorTab==='solid'?'active':''}" onclick="setTab('solid')">Заливка</button><button class="tab-btn ${ui.colorTab==='texture'?'active':''}" onclick="setTab('texture')">Текстура</button></div>`;
+            
+            if (ui.colorTab === 'solid') {
+                html += `<div class="control-group"><label class="control-label">Покрытие</label>
+                <select class="btn-sec" style="width:100%; margin-bottom:12px" onchange="updateTierProp('coating', this.value)">
+                    <option value="cream" ${t.coating==='cream'?'selected':''}>🍰 Крем-чиз (Стандарт)</option>
+                    <option value="velvet" ${t.coating==='velvet'?'selected':''}>☁️ Велюр (Шершавый)</option>
+                    <option value="mastic" ${t.coating==='mastic'?'selected':''}>🍬 Мастика (Гладкая)</option>
+                    <option value="mirror" ${t.coating==='mirror'?'selected':''}>✨ Зеркальная глазурь</option>
+                </select></div>`;
+                
+                html += `<input type="color" style="width:100%; height:60px; border:none; border-radius:10px; margin-bottom:16px" value="${t.color}" oninput="previewTierColor(this.value)" onchange="updateTierProp('color', this.value)">`;
+                html += `<div class="palette">${['#ffffff','#ec4899','#fcd34d','#60a5fa','#34d399','#a78bfa'].map(c => `<div class="swatch" style="background:${c}" onclick="updateTierProp('color', '${c}')"></div>`).join('')}</div>`;
+                
+                // --- НАСТРОЙКА ПОДТЕКОВ ---
+                if(t.shape === 'cylinder' || t.shape === 'box' || t.shape === 'parallelepiped') {
+                    const dr = t.drips || { enabled: false, color: '#3e2723', len: 40, freq: 12 };
+                    html += `<hr style="border:0; border-top:1px solid #eee; margin:16px 0">`;
+                    html += `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px">
+                                <label class="control-label" style="margin:0">🍫 Подтеки</label>
+                                <input type="checkbox" ${dr.enabled?'checked':''} onchange="toggleDrips(this.checked)" style="width:20px; height:20px">
+                             </div>`;
+                    
+                    if(dr.enabled) {
+                        html += `<div style="background:#fff; padding:10px; border-radius:10px; border:1px solid #ddd">
+                                    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center">
+                                        <input type="color" value="${dr.color}" onchange="updateDrips('color', this.value)" style="border:none; width:40px; height:30px">
+                                        <span style="font-size:12px">Цвет глазури</span>
+                                    </div>
+                                    ${mkStepper('Длина капель', dr.len, "updateDrips('len', this.value)", "stepDrips('len', -5)", "stepDrips('len', 5)")}
+                                    ${mkStepper('Частота', dr.freq, "updateDrips('freq', this.value)", "stepDrips('freq', -1)", "stepDrips('freq', 1)")}
+                                 </div>`;
+                    }
+                } else {
+                    html += `<div style="font-size:11px; color:#999; margin-top:10px">⚠️ Подтеки доступны только для Цилиндра</div>`;
+                }
+
+            } else {
+                if(!t.tex) t.tex = {side:defaultTex(), top:defaultTex(), bottom:defaultTex()}; 
+                const p = ui.activeTexPart; const texData = t.tex[p]; const hasTex = !!texData.url;
+                
+                html += `<div class="control-group"><label class="control-label">Зона</label><select class="btn-sec" style="width:100%" onchange="setTexPart(this.value)"><option value="side" ${p==='side'?'selected':''}>Бок</option><option value="top" ${p==='top'?'selected':''}>Верх</option><option value="bottom" ${p==='bottom'?'selected':''}>Низ</option></select></div>`;
+                html += `<div class="btn-grid" style="margin-bottom:16px"><button class="btn-sec" onclick="document.getElementById('tex-upl').click()">📂 Загрузить</button>${hasTex ? `<button class="btn-sec" style="color:red" onclick="clearTexture()">❌ Удалить</button>` : ''}</div><input type="file" id="tex-upl" style="display:none" onchange="handleTextureUpload(this)">`;
+                if (hasTex) {
+                    html += `<div class="control-group" style="display:flex; align-items:center; gap:8px; margin-bottom:12px; background:#fff; padding:8px; border-radius:8px; border:1px solid #ddd;">
+                                <input type="checkbox" id="tex-mix" ${texData.mixColor ? 'checked' : ''} onchange="updateTexProp('mixColor', this.checked)">
+                                <label for="tex-mix" style="margin:0; font-weight:600; font-size:13px">Наложить цвет яруса (Tint)</label>
+                             </div>`;
+
+                    html += `<div class="control-group"><label class="control-label">Режим</label><select class="btn-sec" style="width:100%" onchange="updateTexProp('mode', this.value)"><option value="tile" ${texData.mode==='tile'?'selected':''}>Плитка (Повтор)</option><option value="fit" ${texData.mode==='fit'?'selected':''}>Растянуть</option></select></div>`;
+                    html += mkStepper('Масштаб', texData.scale, "updateTexProp('scale', this.value)", "stepTex('scale', -0.1)", "stepTex('scale', 0.1)");
+                    html += mkStepper('Поворот', texData.rot, "updateTexProp('rot', this.value)", "stepTex('rot', -5)", "stepTex('rot', 5)");
+                    html += mkStepper('Сдвиг X', texData.offX, "updateTexProp('offX', this.value)", "stepTex('offX', -0.05)", "stepTex('offX', 0.05)");
+                    html += mkStepper('Сдвиг Y', texData.offY, "updateTexProp('offY', this.value)", "stepTex('offY', -0.05)", "stepTex('offY', 0.05)");
+                    if(texData.mode === 'tile') {
+                        html += mkStepper('Повтор X', texData.repX, "updateTexProp('repX', this.value)", "stepTex('repX', -0.5)", "stepTex('repX', 0.5)");
+                        html += mkStepper('Повтор Y', texData.repY, "updateTexProp('repY', this.value)", "stepTex('repY', -0.5)", "stepTex('repY', 0.5)");
+                    }
+                } else { html += `<div style="text-align:center; padding:20px; color:#aaa; font-size:12px">Нет текстуры на этой части</div>`; }
+            }
+        }
+    }  else if (menuName === 'decor') {
+        title.innerHTML = '✨ Декор и Топперы';
+        if(ui.selTier === null) {
+            html = '<p style="text-align:center">Выберите ярус</p>';
+        } else {
+            const t = getActiveTiers()[ui.selTier];
+            
+            // --- 1. ЗАГОЛОВОК И КНОПКА МУЛЬТИ-ВЫБОРА (НОВОЕ) ---
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+                        <div class="control-label" style="margin:0">Слои (${t.decor.length})</div>
+                        <button class="btn-sec" style="width:auto; padding:4px 12px; font-size:12px; ${isMultiSelect ? 'background:#ec4899; color:white; border-color:#ec4899' : ''}" 
+                                onclick="toggleMultiSelectMode()">
+                            ${isMultiSelect ? '✓ Готово' : '☑️ Выбрать несколько'}
+                        </button>
+                     </div>`;
+
+            // --- 2. СПИСОК СЛОЕВ (С ПОДДЕРЖКОЙ ГАЛОЧЕК) ---
+            // --- 2. СПИСОК СЛОЕВ (С ПОДДЕРЖКОЙ ГАЛОЧЕК) ---
+// ДОБАВИЛИ ID: decor-list-box
+html += `<div id="decor-list-box" style="max-height:150px; overflow-y:auto; background:#fff; border:1px solid #ddd; border-radius:8px; margin-bottom:12px;">`;
+            if(t.decor.length === 0) html += `<div style="padding:8px; color:#999; font-size:11px">Нет элементов</div>`;
+            
+            // ... (предыдущий код: <div id="decor-list-box" ... )
+
+            t.decor.forEach((d, i) => {
+                // 1. ОПРЕДЕЛЯЕМ ИМЯ
+                let displayName = d.customName; // Сначала ищем ваше личное название
+                
+                if (!displayName) {
+                    // Если вы ничего не вписали, генерируем стандартное
+                    if (d.isText) {
+                        displayName = '"' + d.textContent + '"';
+                    } else if (d.placement === 'volume' || d.placement === 'topper') {
+                        const names = { sphere: '⚪ Шар', cube: '📦 Куб', cylinder: '🕯 Свеча' };
+                        displayName = names[d.shape] || '3D Фигура';
+                    } else if (d.placement === 'topper') {
+                        displayName = '🚩 Топпер';
+                    } else if (d.placement === 'top') {
+                        displayName = '🖼 Картинка (Верх)';
+                    } else {
+                        displayName = '🖼 Стикер (Бок)';
+                    }
+                }
+                
+                // Логика подсветки (оставляем как было)
+                const isSelected = isMultiSelect ? selectedDecors.includes(i) : (ui.selDecorIdx === i);
+                const bg = isSelected ? '#fce7f3' : '#fff';
+                const lockIcon = d.locked ? '🔒 ' : '';
+                const checkIcon = isMultiSelect ? (isSelected ? '☑️ ' : '⬜ ') : '';
+                const clickAction = isMultiSelect ? `toggleDecorSelection(${i})` : `selectDecor(${i})`;
+
+                // Вывод в HTML (используем displayName)
+                html += `<div id="decor-item-${i}" onclick="${clickAction}" style="padding:8px; border-bottom:1px solid #eee; background:${bg}; font-size:12px; display:flex; justify-content:space-between; cursor:pointer; align-items:center">
+                            <span>${checkIcon}${i+1}. ${lockIcon}${displayName}</span>
+                            ${!isMultiSelect ? `<span style="color:red; padding:0 8px" onclick="event.stopPropagation(); removeDecor(${i})">✕</span>` : ''}
+                         </div>`;
+            });
+            html += `</div>`;
+
+            // --- 3. ПЕРЕКЛЮЧАТЕЛЬ ИНТЕРФЕЙСА (ГРУППА или ОДИНОЧНЫЙ) ---
+            if (isMultiSelect) {
+                 // === РЕЖИМ ГРУППОВЫХ ДЕЙСТВИЙ ===
+                 html += `<div class="control-label">Действия с группой (${selectedDecors.length})</div>
+                          <div class="btn-grid" style="margin-bottom:16px">
+                             <button class="btn-sec" onclick="groupAction('lock')">🔒 Закрепить</button>
+                             <button class="btn-sec" onclick="groupAction('unlock')">🔓 Открепить</button>
+                             <button class="btn-sec" style="color:red" onclick="groupAction('delete')">🗑 Удалить</button>
+                             <button class="btn-sec" onclick="duplicateDecor()">📑 Копия</button>
+                          </div>`;
+                 
+                 // Джойстик для группы
+                 if (selectedDecors.length > 0) {
+                     const btn = (icon, dir) => `<button class="btn-sec" onpointerdown="startMove('${dir}')" onpointerup="stopMove()" onpointerleave="stopMove()" style="touch-action:none; user-select:none;">${icon}</button>`;
+                     // --- НОВЫЙ КОМПАКТНЫЙ ДЖОЙСТИК ---
+                    // Вспомогательная функция для генерации маленькой круглой кнопки
+                    const miniBtn = (icon, dir) => 
+                        `<button class="btn-sec" onpointerdown="startMove('${dir}')" onpointerup="stopMove()" onpointerleave="stopMove()" 
+                          style="touch-action:none; user-select:none; width:44px; height:44px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:50%; margin:0 auto; font-size:18px;">
+                          ${icon}
+                        </button>`;
+
+                    html += `<div class="control-label" style="text-align:center; margin-top:10px">Перемещение</div>
+                             
+                             <div style="display:grid; grid-template-columns: 44px 44px 44px; justify-content:center; gap:8px; margin-bottom:12px;">
+                                
+                                <div></div> 
+                                ${miniBtn('▲', 'up')} 
+                                <div></div>
+                                
+                                ${miniBtn('◀', 'left')} 
+                                <div style="display:flex; align-items:center; justify-content:center; font-size:10px; color:#ccc; font-weight:bold;">MOVE</div> 
+                                ${miniBtn('▶', 'right')}
+                                
+                                <div></div> 
+                                ${miniBtn('▼', 'down')} 
+                                <div></div>
+                             </div>
+
+                             <div style="display:flex; justify-content:center; gap:12px; margin-bottom:16px">
+                                <button class="btn-sec" onpointerdown="startMove('in')" onpointerup="stopMove()" onpointerleave="stopMove()" style="width:auto; padding:8px 16px; font-size:13px">↘ Вглубь</button>
+                                <button class="btn-sec" onpointerdown="startMove('out')" onpointerup="stopMove()" onpointerleave="stopMove()" style="width:auto; padding:8px 16px; font-size:13px">↖ Наружу</button>
+                             </div>`;
+                    
+                    // --- ДЕЙСТВИЯ (Оставляем как было) ---
+                    html += `<div class="control-label">Действия</div>
+                             <div class="btn-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px">
+                                <button class="btn-sec" onclick="duplicateDecor()">📑 Копия</button>
+                                <button class="btn-sec" onclick="copyDecorToOther()">➡ В Торт ${activeCakeId===0?'B':'A'}</button>
+                             </div>`;
+                 }
+
+            } else {
+                // === ОБЫЧНЫЙ РЕЖИМ (ВСЕ ВАШИ СТАРЫЕ КНОПКИ) ===
+                html += `<div class="control-label">Добавить</div>
+                         <div class="btn-grid" style="grid-template-columns:1fr 1fr 1fr; margin-bottom:16px">
+                            <button class="btn-sec" onclick="promptAddDecor('side')">+ Бок</button>
+                            <button class="btn-sec" onclick="promptAddDecor('top')">+ Верх</button>
+                            <button class="btn-sec" onclick="promptAddDecor('topper')">+ Топпер</button>
+                         </div>
+                         <div class="control-label">3D Фигуры</div>
+                         <div class="btn-grid" style="grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px">
+                            <button class="btn-sec" onclick="addVolumeFigure('sphere')">⚪ Шар</button>
+                            <button class="btn-sec" onclick="addVolumeFigure('cube')">📦 Куб</button>
+                            <button class="btn-sec" onclick="addVolumeFigure('cylinder')">🕯 Свеча</button>
+                         </div>`;
+
+                // Редактирование одиночного элемента (Ваш старый блок)
+                if(ui.selDecorIdx !== null && t.decor[ui.selDecorIdx]) {
+                    const d = t.decor[ui.selDecorIdx];
+                    const btn = (icon, dir) => `<button class="btn-sec" onpointerdown="startMove('${dir}')" onpointerup="stopMove()" onpointerleave="stopMove()" style="touch-action:none; user-select:none;">${icon}</button>`;
+
+                    html += `<div class="control-label">Редактирование</div>
+                             <div style="background:#f8f9fa; padding:10px; border-radius:12px; border:1px solid #eee">`;
+                             html += `<div class="control-label">Редактирование</div>
+                             <div style="background:#f8f9fa; padding:10px; border-radius:12px; border:1px solid #eee">
+                             
+                             <div style="margin-bottom:12px">
+                                <label style="font-size:10px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:4px; display:block">Название</label>
+                                <input type="text" value="${d.customName || ''}" placeholder="Например: Красный бант" 
+                                       class="btn-sec" style="width:100%; font-size:14px; padding:8px; height:auto; min-height:36px" 
+                                       onchange="renameDecor(this.value)">
+                             </div>`;
+                             
+                    // ... (дальше идет Галочка закрепления и всё остальное) ...
+                    
+                    // Галочка закрепления (Исправленная)
+                    html += `<div onclick="toggleDecorLock(!${d.locked})" style="margin-bottom:12px; background:#fff; padding:8px; border-radius:8px; border:1px solid ${d.locked ? '#ec4899' : '#ddd'}; display:flex; align-items:center; justify-content:space-between; cursor:pointer">
+                                <div style="display:flex; align-items:center">
+                                    <span style="font-size:16px; margin-right:6px">${d.locked ? '🔒' : '🔓'}</span>
+                                    <span style="font-weight:600; font-size:13px; margin:0; color:#333">${d.locked ? 'Объект закреплен' : 'Закрепить объект'}</span>
+                                </div>
+                                <input type="checkbox" ${d.locked ? 'checked' : ''} style="width:20px; height:20px; accent-color:#ec4899; pointer-events:none;">
+                             </div>
+                             ${d.locked ? '<div style="font-size:10px; color:#ec4899; margin-bottom:10px; text-align:center">ℹ️ Чтобы выбрать закрепленный объект, удерживайте на нем палец 1 секунду.</div>' : ''}`;
+
+                    // --- ТОНАЛЬНОСТЬ КАРТИНКИ ---
+                    // Показываем только для картинок (не для текста и не для 3D фигур, у фигур свой цвет)
+                    if (!d.isText && d.placement !== 'volume') {
+                        html += `<div class="control-group" style="margin-top:12px; border-bottom:1px solid #eee; padding-bottom:12px;">
+                                    <label class="control-label" style="display:flex; justify-content:space-between;">
+                                        <span>🎨 Тональность (Фильтр)</span>
+                                        <span style="font-weight:normal; color:#888; font-size:10px;">Белый = Оригинал</span>
+                                    </label>
+                                    <div style="display:flex; gap:10px; align-items:center;">
+                                        <input type="color" value="${d.tintColor || '#ffffff'}" 
+                                               style="height:40px; width:60px; border:none; padding:0; background:none;" 
+                                               oninput="updateDecorTint(this.value)">
+                                               
+                                        <button class="btn-sec" onclick="updateDecorTint('#ffffff')" style="padding:8px 12px; font-size:12px;">
+                                            Сбросить (Белый)
+                                        </button>
+                                    </div>
+                                 </div>`;
+                    }
+                    // Текст
+                    if (d.isText) {
+                        html += `<div style="margin-bottom:16px; border-bottom:1px solid #ddd; padding-bottom:12px;">
+                                    <div class="control-label" style="color:#ec4899">🅰 Текст и Шрифт</div>
+                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
+                                        <input type="color" value="${d.color || '#000000'}" style="height:30px; width:40px; border:none; padding:0; background:none" oninput="updateDecorTextProp('color', this.value)">
+                                        <span style="font-size:12px">Цвет текста</span>
+                                    </div>
+                                    <select class="btn-sec" style="width:100%; margin-bottom:8px; font-size:16px" onchange="updateDecorTextProp('font', this.value)">
+                                        ${GFONTS.map(f => `<option value='${f.f}' style='font-family:${f.f}' ${d.font===f.f?'selected':''}>${f.n}</option>`).join('')}
+                                    </select>
+                                    <input type="text" class="btn-sec" style="width:100%" placeholder="Или свой шрифт..." onchange="updateDecorTextProp('fontCustom', this.value)">
+                                    <button class="btn-sec" style="margin-top:8px; border:1px dashed #ec4899; color:#ec4899; width:100%" onclick="autoSizeDecor()">
+                                        ✨ Исправить пропорции (Авто-размер)
+                                    </button>
+                                 </div>`;
+                    }
+
+                    // Цвет 3D
+                    if (d.placement === 'volume') {
+                        html += `<div style="margin-bottom:16px; border-bottom:1px solid #ddd; padding-bottom:12px;">
+                                    <div class="control-label" style="color:#ec4899">🎨 Цвет фигуры</div>
+                                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">
+                                        <input type="color" value="${d.color || '#ffffff'}" style="height:40px; width:100%; border:none; border-radius:8px; cursor:pointer;" oninput="updateVolumeColor(this.value)">
+                                    </div>
+                                    <div class="palette" style="margin-top:8px">
+                                        ${['#ffffff','#ff0000','#ffeb3b','#4caf50','#2196f3','#9c27b0','#795548','#000000'].map(c => `<div class="swatch" style="background:${c}; width:30px; height:30px;" onclick="updateVolumeColor('${c}')"></div>`).join('')}
+                                    </div>
+                                 </div>`;
+                    }
+
+                    // Выравнивание
+                    if (d.placement === 'volume' || d.placement === 'topper') {
+                        html += `<div class="control-label" style="margin-top:10px; color:#ec4899">🎯 Выравнивание</div>
+                                 <div class="btn-grid" style="grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:16px">
+                                    <button class="btn-sec" onclick="alignDecor('centerX')">Центр X (↔)</button>
+                                    <button class="btn-sec" onclick="alignDecor('centerZ')">Центр Z (↕)</button>
+                                    <button class="btn-sec" onclick="alignDecor('straight')" style="grid-column: span 2; color:#ec4899; border-color:#ec4899">Выпрямить всё (●)</button>
+                                 </div>`;
+                    }
+
+                    // Джойстик и кнопки
+                    html += `<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-bottom:12px; text-align:center;">
+                                <div></div> ${btn('▲', 'up')} <div></div>
+                                ${btn('◀', 'left')} <div style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">MOVE</div> ${btn('▶', 'right')}
+                                <div></div> ${btn('▼', 'down')} <div></div>
+                             </div>
+                             <div class="btn-grid" style="margin-bottom:16px">
+                                ${btn('↘ Вглубь', 'in')} ${btn('↖ Наружу', 'out')}
+                             </div>
+                             <div class="control-label">Действия</div>
+                             <div class="btn-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px">
+                                <button class="btn-sec" onclick="duplicateDecor()">📑 Копия</button>
+                                <button class="btn-sec" onclick="copyDecorToOther()">➡ В Торт ${activeCakeId===0?'B':'A'}</button>
+                             </div>`;
+
+                             // ... (после кнопок Копия и В Торт ...)
+
+// --- НОВЫЙ БЛОК: СИММЕТРИЯ ---
+html += `<div class="control-label" style="margin-top:16px">❄️ Радиальная симметрия</div>
+         <div class="btn-grid" style="grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:16px">
+            <button class="btn-sec" onclick="makeSymmetry(2)">x2</button>
+            <button class="btn-sec" onclick="makeSymmetry(4)">x4</button>
+            <button class="btn-sec" onclick="makeSymmetry(6)">x6</button>
+            <button class="btn-sec" onclick="makeSymmetry(8)">x8</button>
+         </div>`;
+
+// ... (дальше идет control-label Размеры) ...
+
+                    // Размеры и Вращение
+                    html += `<div class="control-label">Размеры (мм)</div>
+                             <div style="margin-bottom:8px; background:#fff; padding:8px; border-radius:8px; border:1px solid #ddd; display:flex; align-items:center;">
+                                <input type="checkbox" id="lock-aspect" ${ui.lockAspect ? 'checked' : ''} onchange="toggleAspect(this.checked)" style="width:18px; height:18px; accent-color:#ec4899">
+                                <label for="lock-aspect" style="margin-left:8px; font-weight:600; font-size:12px;">🔗 Сохранять пропорции</label>
+                             </div>
+                             <div style="margin-bottom:8px">
+                                <div style="font-size:11px; color:#666; margin-bottom:4px">↔ Ширина</div>
+                                <div class="stepper"><button onclick="stepDecorDim('w', -2)">-</button><input type="number" value="${d.w}" oninput="updateDecorDim('w', this.value)"><button onclick="stepDecorDim('w', 2)">+</button></div>
+                             </div>
+                             <div style="margin-bottom:16px">
+                                <div style="font-size:11px; color:#666; margin-bottom:4px">↕ Высота</div>
+                                <div class="stepper"><button onclick="stepDecorDim('h', -2)">-</button><input type="number" value="${d.h}" oninput="updateDecorDim('h', this.value)"><button onclick="stepDecorDim('h', 2)">+</button></div>
+                             </div>
+                             <div class="control-label">Вращение (${d.rot||0}°)</div>
+                             <div style="display:flex; align-items:center; gap:4px; margin-bottom:12px">
+                                <button class="btn-sec" onclick="stepDecorDim('rot', -45)" style="width:40px">-45</button>
+                                <input type="range" min="-180" max="180" value="${d.rot||0}" step="1" style="flex:1" oninput="updateDecorDim('rot', this.value)">
+                                <button class="btn-sec" style="color:#ec4899; font-weight:bold; padding:0 10px;" onclick="updateDecorDim('rot', 0)">●</button>
+                                <button class="btn-sec" onclick="stepDecorDim('rot', 45)" style="width:40px">+45</button>
+                             </div>`;
+
+                    // Наклоны (для 3D)
+                    if (d.placement === 'volume' || d.placement === 'topper') {
+                        html += `<div class="control-label" style="margin-top:12px">Наклон вперёд/назад (${d.rotX || 0}°)</div>
+                                 <div style="display:flex; align-items:center; gap:4px; margin-bottom:8px">
+                                    <button class="btn-sec" onclick="stepVolumeRot('rotX', -45)" style="width:40px">-45</button>
+                                    <input type="range" min="-180" max="180" value="${d.rotX || 0}" step="1" style="flex:1" oninput="updateVolumeRot('rotX', this.value)">
+                                    <button class="btn-sec" style="color:#ec4899; font-weight:bold; padding:0 10px;" onclick="updateVolumeRotX(0)">●</button>
+                                    <button class="btn-sec" onclick="stepVolumeRot('rotX', 45)" style="width:40px">+45</button>
+                                 </div>
+                                 <div class="control-label">Наклон влево/вправо (${d.rotZ || 0}°)</div>
+                                 <div style="display:flex; align-items:center; gap:4px; margin-bottom:16px">
+                                    <button class="btn-sec" onclick="stepVolumeRot('rotZ', -45)" style="width:40px">-45</button>
+                                    <input type="range" min="-180" max="180" value="${d.rotZ || 0}" step="1" style="flex:1" oninput="updateVolumeRot('rotZ', this.value)">
+                                    <button class="btn-sec" style="color:#ec4899; font-weight:bold; padding:0 10px;" onclick="updateVolumeRot('rotZ', 0)">●</button>
+                                    <button class="btn-sec" onclick="stepVolumeRot('rotZ', 45)" style="width:40px">+45</button>
+                                 </div>`;
+                    }
+
+                    html += `</div>`; // Закрываем блок редактирования
+                }
+            }
+          }  
+        } else if (menuName === 'scene') {
+    title.innerHTML = '📷 Вид и Камера';
+    
+    // --- НОВЫЙ БЛОК: РАССТОЯНИЕ ---
+    // Показываем его только если включен режим A+B (viewMode === 'both')
+    if (viewMode === 'both') {
+        html += `<div class="control-label">↔ Расстояние между тортами</div>
+                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; background:#fff; padding:10px; border-radius:10px; border:1px solid #ddd">
+                    <span style="font-size:12px; font-weight:bold; color:#666">Близко</span>
+                    <input type="range" min="150" max="600" step="10" value="${cakeGap}" 
+                           style="flex:1; accent-color:#ec4899; height:20px"
+                           oninput="updateCakeGap(this.value)">
+                    <span style="font-size:12px; font-weight:bold; color:#666">Далеко</span>
+                 </div>`;
+    }
+
+    html += `<div class="control-label">Ракурс</div>
+             <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:16px">
+                <button class="btn-sec" onclick="setCamView('front')" style="padding:10px 0; text-align:center">F</button>
+                <button class="btn-sec" onclick="setCamView('left')" style="padding:10px 0; text-align:center">L</button>
+                <button class="btn-sec" onclick="setCamView('right')" style="padding:10px 0; text-align:center">R</button>
+                <button class="btn-sec" onclick="setCamView('top')" style="padding:10px 0; text-align:center">T</button>
+             </div>
+             <button class="btn-sec" onclick="setCamView('reset')" style="width:100%; margin-bottom:16px">🔄 Сброс (ISO)</button>
+             <hr style="border:0; border-top:1px solid #eee; margin-bottom:16px">
+             <button class="btn-full" onclick="takeScreenshot()">📸 Сохранить Скриншот</button>`;
+}
+  
+ else if (menuName === 'project') {
+        title.innerHTML = '💾 Файл и AR';
+        
+        // Генерируем текущее имя
+        const dateStr = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}).replace(':','-');
+        const modeSuffix = (viewMode === 'both') ? 'Comparison' : (activeCakeId === 0 ? 'Cake_A' : 'Cake_B');
+        const defaultName = `${modeSuffix}_${dateStr}`;
+
+        html += `
+            <div class="control-label">Новый проект</div>
+            <button class="btn-sec" onclick="resetProject()" style="width:100%; color:red; border-color:red; margin-bottom:20px">
+                🗑 Сбросить всё в ноль
+            </button>
+
+            <div class="control-label">Сохранение проекта (JSON)</div>
+            <button class="btn-full" onclick="saveProject()">Скачать файл проекта</button>
+            <button class="btn-sec" onclick="loadProject()" style="margin-top:8px">Загрузить проект</button>
+            
+            <hr style="border:0; border-top:1px solid #eee; margin:20px 0">
+            
+            <div class="control-label" style="color:#4f46e5">📱 Экспорт в AR (3D)</div>
+            
+            <div style="margin-bottom:12px">
+                <label style="font-size:11px; color:#666; display:block; margin-bottom:4px">Имя файла</label>
+                <input type="text" id="export-name" value="${defaultName}" 
+                       class="btn-sec" style="width:100%; border:1px solid #4f46e5; color:#333">
+            </div>
+
+            <div class="btn-grid">
+                <button class="btn-sec" style="border:1px solid #4f46e5; color:#4f46e5" onclick="exportAR('usdz')">
+                    🍏 iPhone (.usdz)
+                </button>
+                <button class="btn-sec" style="border:1px solid #4f46e5; color:#4f46e5" onclick="exportAR('glb')">
+                    🤖 Android (.glb)
+                </button>
+            </div>
+            <div style="font-size:10px; color:#999; margin-top:8px; text-align:center; line-height:1.4">
+                Выберите формат в зависимости от устройства,<br>на котором будете открывать файл.
+            </div>`;
+    }
+
+    content.innerHTML = html; 
+    sheet.classList.add('open');
+
+    // --- 2. ВОССТАНАВЛИВАЕМ ПОЗИЦИЮ ---
+    if (menuName === 'decor') {
+        const newList = document.getElementById('decor-list-box');
+        
+        if (newList) {
+            // ВАРИАНТ А: Если мы просто обновляем меню (ставим галочки) -> ВОЗВРАЩАЕМ СКРОЛЛ
+            if (wasDecorListOpen) {
+                newList.scrollTop = savedScroll;
+            } 
+            // ВАРИАНТ Б: Если меню открылось впервые (кликнули 3D-объект) -> ИДЕМ К ОБЪЕКТУ
+            else {
+                let targetIdx = null;
+                if (typeof scrollTarget !== 'undefined' && scrollTarget !== null) {
+                    targetIdx = scrollTarget;
+                } else if (ui.selDecorIdx !== null) {
+                    targetIdx = ui.selDecorIdx;
+                }
+
+                if (targetIdx !== null) {
+                    const item = document.getElementById(`decor-item-${targetIdx}`);
+                    // 'block: center' лучше, чтобы объект был по центру списка, а не у края
+                    if (item) item.scrollIntoView({ block: 'center', behavior: 'auto' });
+                }
+            }
+        }
+    }
+}
+/* --- 4. FUNCTIONS --- */
+function mkStepper(lbl, val, onInp, onDec, onInc) {
+    // ИСПРАВЛЕНИЕ: Экранируем кавычки, чтобы JS код внутри HTML не ломался
+    // Было: startHold('stepProp('d', 10)') -> ОШИБКА
+    // Стало: startHold('stepProp(\'d\', 10)') -> ОК
+    const safeDec = onDec.replace(/'/g, "\\'");
+    const safeInc = onInc.replace(/'/g, "\\'");
+
+    return `<div class="control-group">
+              <label class="control-label">${lbl}</label>
+              <div class="stepper">
+                <button onpointerdown="startHold('${safeDec}')" onpointerup="stopHold()" onpointerleave="stopHold()">-</button>
+                <input type="number" value="${val}" oninput="${onInp}">
+                <button onpointerdown="startHold('${safeInc}')" onpointerup="stopHold()" onpointerleave="stopHold()">+</button>
+              </div>
+            </div>`;
+}
+
+function renderCompareTable() {
+    const c = document.getElementById('cmp-content'); c.innerHTML = '';
+    cakes.forEach((tiers, i) => {
+        let colHtml = '<div class="cmp-col">'; let totalH = 0; let totalW = 0;
+        [...tiers].reverse().forEach((t) => {
+            const h = (t.shape==='sphere' ? t.d : t.h); totalH += h; totalW += (t.weight || 0);
+            const dimStr = (t.shape==='box') ? `${t.d/10}x${t.d/10}` : (t.shape==='parallelepiped' ? `${t.w/10}x${t.dep/10}` : `Ø${t.d/10}`);
+            colHtml += `<div class="cmp-tier"><strong>${dimStr} см</strong> | h ${h/10} см<br>${t.filling || '-'}<br>${t.weight || 0} кг</div>`;
+        });
+        colHtml += `<div style="margin-top:4px; font-weight:bold; border-top:1px solid #ccc; padding-top:4px">Высота: ${totalH/10} см<br>Вес: ${Math.round(totalW*10)/10} кг</div></div>`;
+        c.innerHTML += colHtml;
+    });
+}
+
+// Ввод вручную (Ярусы)
+function updateTierProp(key, val) {
+    if(ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    
+    // Преобразуем строки в числа для размеров
+    if(['d','h','w','dep','n'].includes(key)) val = parseInt(val);
+    else if(key==='weight') val = parseFloat(val);
+    
+    t[key] = val;
+    
+    rebuildScene();
+    recordHistory();
+    if(viewMode === 'both') renderCompareTable();
+    
+    // --- ИСПРАВЛЕНИЕ ---
+    // Если мы изменили ФОРМУ (shape), нужно принудительно перерисовать меню,
+    // чтобы появились нужные поля (Ширина/Глубина вместо Диаметра).
+    if (key === 'shape') {
+        openMenu('structure_edit');
+    }
+}
+
+function stepProp(key, delta) {
+    if(ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    let val = (parseFloat(t[key])||0) + delta;
+    if(key==='weight'){ val = Math.round(val*10)/10; if(val<0) val=0; } else { if(val<3) val=3; }
+    t[key] = val;
+    
+    // Ручное обновление инпута
+    const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+    inputs.forEach(inp => { 
+        const attr = inp.getAttribute('oninput'); 
+        if(attr && attr.includes(`'${key}'`)) inp.value = val; 
+    });
+
+    rebuildScene();
+    recordHistory();
+    if(viewMode === 'both') renderCompareTable();
+}
+// Кнопки +/- (Ярусы)
+function stepProp(key, delta) {
+    if(ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    let val = (parseFloat(t[key])||0) + delta;
+    
+    // Лимиты
+    if(key==='weight'){ val = Math.round(val*10)/10; if(val<0) val=0; } 
+    else { if(val<3) val=3; } // Минимальный размер 3мм
+    
+    t[key] = val;
+    
+    // ВАЖНО: Находим инпут на экране и обновляем его значение вручную
+    const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+    inputs.forEach(inp => { 
+        // Ищем инпут, у которого в атрибуте oninput есть имя нашего свойства (например 'd')
+        const attr = inp.getAttribute('oninput'); 
+        if(attr && attr.includes(`'${key}'`)) inp.value = val; 
+    });
+
+    rebuildScene();
+    recordHistory();
+    if(viewMode === 'both') renderCompareTable();
+}
+
+function stepTex(key, delta) {
+    if(ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier]; const tex = t.tex[ui.activeTexPart];
+    let val = (tex[key] || 0) + delta; val = Math.round(val * 100) / 100; tex[key] = val;
+    const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+    inputs.forEach(inp => { const onInputAttr = inp.getAttribute('oninput'); if(onInputAttr && onInputAttr.includes(`'${key}'`)) inp.value = val; });
+    rebuildScene(); recordHistory();
+}
+
+function setTab(t) { ui.colorTab = t; openMenu('color'); }
+function setTexPart(p) { ui.activeTexPart = p; openMenu('color'); }
+function compressImage(file, maxSize, callback) {
+    const reader = new FileReader(); reader.onload = e => {
+        const img = new Image(); img.onload = () => {
+            let w = img.width, h = img.height; if (w > maxSize || h > maxSize) { const ratio = maxSize / Math.max(w, h); w *= ratio; h *= ratio; }
+            const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h); callback(canvas.toDataURL('image/png'));
+        }; img.src = e.target.result;
+    }; reader.readAsDataURL(file);
+}
+function handleTextureUpload(inp) { if(!inp.files[0] || ui.selTier===null) return; compressImage(inp.files[0], 1024, (b64) => { const t = getActiveTiers()[ui.selTier]; if(!t.tex) t.tex = {side:defaultTex(), top:defaultTex(), bottom:defaultTex()}; t.tex[ui.activeTexPart].url = b64; t.tex[ui.activeTexPart].scale = 1; t.tex[ui.activeTexPart].mode = 'tile'; rebuildScene(); recordHistory(); openMenu('color'); }); inp.value = ''; }
+function clearTexture() { if(ui.selTier === null) return; const t = getActiveTiers()[ui.selTier]; t.tex[ui.activeTexPart] = defaultTex(); rebuildScene(); recordHistory(); openMenu('color'); }
+
+function updateTexProp(key, val) { 
+    if(ui.selTier === null) return; 
+    const t = getActiveTiers()[ui.selTier]; const tex = t.tex[ui.activeTexPart]; 
+    if(key !== 'mode' && typeof val !== 'boolean') val = parseFloat(val); // Fix for boolean checkbox
+    tex[key] = val; 
+    rebuildScene(); recordHistory(); 
+}
+
+function switchCake(id) {
+    // ... (код переключения viewMode как и был) ...
+    if (id === 'both') { 
+        viewMode = 'both'; activeCakeId = 0; 
+        document.getElementById('compare-overlay').style.display = 'block'; renderCompareTable(); 
+    } else { 
+        viewMode = 'single'; activeCakeId = id; 
+        document.getElementById('compare-overlay').style.display = 'none'; 
+    } 
+    
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active')); 
+    if(id === 'both') document.getElementById('seg-both').classList.add('active'); 
+    else document.getElementById(`seg-${id}`).classList.add('active'); 
+    
+    // ВЫЗЫВАЕМ ОБНОВЛЕНИЕ КАМЕРЫ (Чтобы выставить высоту нового торта)
+    updateCameraTarget(); 
+    
+    rebuildScene(); 
+    closeSheet(); 
+}
+// forceCenter = true только при смене торта (кнопки A/B)
+
+function updateCameraTarget() {
+    // Просто считаем высоту торта, чтобы камера смотрела в центр
+    let totalHeight = 0;
+    const currentTiers = cakes[activeCakeId];
+    if (currentTiers && currentTiers.length > 0) {
+        currentTiers.forEach(t => {
+            const h = (t.shape === 'sphere') ? t.d : (t.h || 0);
+            totalHeight += h;
+        });
+    }
+    // Выставляем высоту прицела на середину торта
+    const targetY = (totalHeight > 0) ? totalHeight / 2 : 100;
+    
+    controls.target.y = targetY;
+    // X и Z выставит функция animate() в следующем кадре
+    
+    controls.update();
+}
+  
+function setCamView(type) { 
+    let tx = 0; 
+    // Обновлено: используем cakeGap вместо 220
+    if (viewMode === 'single') tx = (activeCakeId === 0) ? -cakeGap : cakeGap; 
+    
+    controls.target.set(tx, 100, 0); 
+    
+    if (type === 'front') camera.position.set(tx, 100, 600); 
+    if (type === 'left') camera.position.set(tx - 600, 100, 0); 
+    if (type === 'right') camera.position.set(tx + 600, 100, 0); 
+    if (type === 'top') camera.position.set(tx, 800, 0); 
+    if (type === 'reset') camera.position.set(tx + 400, 300, 400); 
+    
+    controls.update(); 
+}
+
+// Глобальный таймер для долгого нажатия
+let longPressTimer = null;
+let longPressMoveHandler = null; // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+
+function onPointerDown(e) {
+    if(e.target.closest('.bottom-sheet') || e.target.closest('.toolbar') || e.target.closest('.top-bar')) return;
+
+    // 1. ЗАПОМИНАЕМ МЕСТО НАЖАТИЯ
+    tapStartX = e.clientX;
+    tapStartY = e.clientY;
+
+    // --- ЛОГИКА ЛИНЕЙКИ ---
+    if (rulerMode) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(group.children, true);
+        if (hits.length > 0) {
+            const point = hits[0].point;
+            if (rulerStep === 0) {
+                clearRulerVisuals();
+                rulerStart.copy(point);
+                rulerMarkerA = createDot(point, 0x00ff00);
+                rulerStep = 1;
+                if (navigator.vibrate) navigator.vibrate(50);
+            } else {
+                rulerMarkerB = createDot(point, 0xff0000);
+                rulerLine = drawLine(rulerStart, point);
+                const dist = rulerStart.distanceTo(point);
+                const label = document.getElementById('measure-label');
+                label.innerText = Math.round(dist) + ' мм';
+                label.style.display = 'block';
+                updateMeasureLabel();
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                rulerStep = 0;
+            }
+            renderer.render(scene, camera);
+        }
+        return;
+    }
+
+    // --- ОБЫЧНЫЙ РЕЖИМ (ПОИСК ОБЪЕКТА) ---
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(group.children, true);
+
+    let targetObj = null;
+
+    // 2. ЕСЛИ ВО ЧТО-ТО ПОПАЛИ - ПЫТАЕМСЯ ПОНЯТЬ, ЧТО ЭТО
+    if (hits.length > 0) {
+        const firstHit = hits[0];
+        
+        // Умный поиск: приоритет Декору, если он рядом (в радиусе 5 единиц)
+        let foundHit = hits.find(h => 
+            h.distance < firstHit.distance + 5 && 
+            (
+                (h.object.userData.type === 'decor') || 
+                (h.object.parent && h.object.parent.userData.type === 'decor')
+            )
+        );
+
+        // Если декора рядом нет, ищем Ярус
+        if (!foundHit) {
+            foundHit = hits.find(h => h.object.userData.type || (h.object.parent && h.object.parent.userData.type));
+        }
+
+        // Извлекаем сам объект из Hilt
+        if (foundHit) {
+            let obj = foundHit.object;
+            if(!obj.userData.type && obj.parent && obj.parent.userData.type) obj = obj.parent;
+            targetObj = obj; // НАШЛИ ВАЛИДНУЮ ЦЕЛЬ!
+        }
+    }
+
+    // 3. ГЛАВНАЯ РАЗВИЛКА
+    if (targetObj) {
+        // === ПОПАЛИ В ОБЪЕКТ (ЯРУС ИЛИ ДЕКОР) ===
+        const ud = targetObj.userData;
+
+        // Если кликнули по другому торту в режиме сравнения
+        if(viewMode === 'both' && ud.cIdx !== activeCakeId) {
+            activeCakeId = ud.cIdx;
+            updateCameraTarget();
+        }
+
+        ui.selTier = ud.tIdx; // Подсвечиваем ярус
+
+        if(ud.type === 'decor') {
+            // --- ДЕКОР ---
+            const decorItem = getActiveTiers()[ud.tIdx].decor[ud.dIdx];
+            
+            if (decorItem.locked) {
+                // Логика разблокировки (Long Press)
+                isDragging = false; controls.enabled = true;
+                longPressMoveHandler = function(ev) {
+                    const dist = Math.hypot(ev.clientX - tapStartX, ev.clientY - tapStartY);
+                    if (dist > 10) {
+                        if (longPressTimer) clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                        window.removeEventListener('pointermove', longPressMoveHandler);
+                        longPressMoveHandler = null;
+                    }
+                };
+                window.addEventListener('pointermove', longPressMoveHandler);
+
+                longPressTimer = setTimeout(() => {
+                    decorItem.locked = false; 
+                    ui.selDecorIdx = ud.dIdx; ui.selTier = ud.tIdx; 
+                    openMenu('decor');
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    if (longPressMoveHandler) {
+                        window.removeEventListener('pointermove', longPressMoveHandler);
+                        longPressMoveHandler = null;
+                    }
+                    isDragging = true; controls.enabled = false; 
+                    dragData = {
+                        startX: tapStartX, startY: tapStartY,
+                        startValX: decorItem.x || 0, startValY: decorItem.y || 0, startValZ: decorItem.z || 0,
+                        placement: decorItem.placement
+                    };
+                    window.addEventListener('pointermove', onPointerMove);
+                    window.addEventListener('pointerup', onPointerUp);
+                }, 1000);
+                return; 
+            }
+
+            // Обычный выбор декора
+            let indicesToDrag = [];
+            if (isMultiSelect) {
+                if (selectedDecors.includes(ud.dIdx)) indicesToDrag = [...selectedDecors];
+                else { toggleDecorSelection(ud.dIdx); return; }
+            } else {
+                ui.selDecorIdx = ud.dIdx; openMenu('decor');
+                if (decorItem.symId) {
+                    const tier = getActiveTiers()[ud.tIdx];
+                    tier.decor.forEach((d, i) => { if (d.symId === decorItem.symId) indicesToDrag.push(i); });
+                } else indicesToDrag = [ud.dIdx];
+            }
+            
+            isDragging = true; controls.enabled = false; 
+            dragData = { startX: e.clientX, startY: e.clientY, targets: [] };
+            const tier = getActiveTiers()[ud.tIdx];
+            indicesToDrag.forEach(idx => {
+                const d = tier.decor[idx];
+                if (d.locked) return;
+                dragData.targets.push({ obj: d, startValX: d.x||0, startValY: d.y||0, startValZ: d.z||0, placement: d.placement });
+            });
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+
+        } else {
+            // === ЯРУС (С ОБНОВЛЕНИЕМ МЕНЮ) ===
+            ui.selDecorIdx = null; 
+            ui.selTier = ud.tIdx;
+
+            // 1. Сначала обновляем выделение в 3D (розовая обводка)
+            rebuildScene();
+
+            // 2. Теперь проверяем меню.
+            // Добавили проверку "|| ui.activeMenu === 'structure'", 
+            // чтобы обновление срабатывало, даже если программа считает, что мы в списке.
+            if (ui.activeMenu === 'structure_edit' || ui.activeMenu === 'structure') {
+                 openMenu('structure_edit'); // Принудительно открываем настройки нового яруса
+            } else if (ui.activeMenu === 'color') {
+                 openMenu('color'); // Если были в цвете — обновляем цвет для нового яруса
+            } else if (ui.activeMenu === 'decor') {
+                 openMenu('decor'); // Если были в декоре — показываем слои нового яруса
+            }
+        }
+    } else {
+        // === НИКУДА НЕ ПОПАЛИ (ПУСТОТА) ===
+        // Гарантированный сброс
+        ui.selTier = null; 
+        ui.selDecorIdx = null; 
+        rebuildScene(); 
+        closeSheet(); 
+    }
+}
+
+function onPointerUp() {
+    // 1. ГЛАВНОЕ ИСПРАВЛЕНИЕ: Отменяем таймер яруса, если палец поднят
+    
+
+    // 2. Отменяем таймер замка (декор)
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+
+    // 3. Удаляем следилку движения (декор)
+    if (longPressMoveHandler) {
+        window.removeEventListener('pointermove', longPressMoveHandler);
+        longPressMoveHandler = null;
+    }
+
+    // 4. Сброс остальных статусов
+    isDragging = false;
+    controls.enabled = true;
+    
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+
+    // Скрываем направляющие
+    if (snapLines.x) snapLines.x.visible = false;
+    if (snapLines.z) snapLines.z.visible = false;
+    
+    document.getElementById('drag-tooltip').style.display = 'none';
+    
+    recordHistory();
+    if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
+}
+
+function onPointerMove(e) {
+  
+    
+    // Если драг не активен
+    if (!isDragging || !dragData || !dragData.targets || dragData.targets.length === 0) return;
+
+    const dx = e.clientX - dragData.startX;
+    const dy = e.clientY - dragData.startY;
+    
+    const angle = controls.getAzimuthalAngle();
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    // Тултип с координатами
+    const tooltip = document.getElementById('drag-tooltip');
+    
+    // Флаги, сработал ли магнит хоть у одного объекта
+    let anySnapX = false;
+    let anySnapZ = false;
+
+    dragData.targets.forEach(item => {
+        const d = item.obj;
+        let newX, newY, newZ;
+
+        if (item.placement === 'side') {
+            // --- СТИКЕРЫ ---
+            const decorAng = (item.startValX) * Math.PI * 2; 
+            const viewFactor = Math.cos(angle - decorAng); 
+            const direction = (viewFactor >= 0) ? 1 : -1;
+            
+            // Сырое значение
+            let rawX = (item.startValX + (dx * 0.0002 * direction)) % 1;
+            if (rawX < 0) rawX += 1;
+
+            // --- МАГНИТ (К центру спереди 0.0, сзади 0.5, слева 0.25, справа 0.75) ---
+            const targets = [0, 0.25, 0.5, 0.75, 1.0];
+            let snappedX = rawX;
+            
+            // Ищем ближайшую цель
+            for(let t of targets) {
+                if (Math.abs(rawX - t) < SNAP_DIST_SIDE) {
+                    snappedX = t;
+                    anySnapX = true; // Сработал магнит!
+                    if (t === 1.0) snappedX = 0; // 1.0 это то же самое что 0
+                    break; 
+                }
+            }
+            newX = snappedX;
+            newY = item.startValY - (dy * 0.0002);
+
+            d.x = newX;
+            d.y = newY;
+
+        } else if (item.placement === 'topper' || item.placement === 'volume') {
+            // --- 3D ОБЪЕКТЫ ---
+            const moveX = (dx * cosA * 0.2);
+            const moveZ = -(dx * sinA * 0.2);
+            const moveY = -(dy * 0.2);
+
+            let rawX = item.startValX + moveX;
+            let rawZ = item.startValZ + moveZ;
+
+            // --- МАГНИТ X ---
+            if (Math.abs(rawX) < SNAP_DIST_3D) { 
+                rawX = 0; 
+                anySnapX = true; 
+            }
+            
+            // --- МАГНИТ Z ---
+            if (Math.abs(rawZ) < SNAP_DIST_3D) { 
+                rawZ = 0; 
+                anySnapZ = true; 
+            }
+
+            d.x = rawX;
+            d.z = rawZ;
+            d.y = item.startValY + moveY;
+        } else {
+            // --- TOP (КРЫШКА) ---
+            const moveX = (dx * cosA + dy * sinA) * 0.25;
+            const moveZ = (dy * cosA - dx * sinA) * 0.25;
+            
+            let rawX = item.startValX + moveX;
+            let rawZ = item.startValZ + moveZ;
+
+             // Магнит к центру
+            if (Math.abs(rawX) < SNAP_DIST_3D) { rawX = 0; anySnapX = true; }
+            if (Math.abs(rawZ) < SNAP_DIST_3D) { rawZ = 0; anySnapZ = true; }
+
+            d.x = rawX;
+            d.z = rawZ;
+        }
+    });
+
+    // --- ВИЗУАЛИЗАЦИЯ И ВИБРАЦИЯ ---
+    
+    // Вибрация (только в момент входа в зону магнита)
+    if ((anySnapX && !isSnapped.x) || (anySnapZ && !isSnapped.z)) {
+        if (navigator.vibrate) navigator.vibrate(15); // Очень короткий "тук"
+    }
+    isSnapped.x = anySnapX;
+    isSnapped.z = anySnapZ;
+
+    // Рисуем линии
+    // Мы передаем позицию первого объекта, чтобы знать где рисовать
+    const firstObj = dragData.targets[0].obj;
+    const pos = { x: firstObj.x, y: firstObj.y, z: firstObj.z };
+    
+    // Для стикеров логика линий другая (пока отключим визуализацию линий для стикеров, там сложнее с 3D координатами)
+    if (dragData.targets[0].placement !== 'side') {
+        updateSnapLines(anySnapX, anySnapZ, pos);
+    } else {
+        // Для стикеров можно просто скрыть линии
+        if(snapLines.x) snapLines.x.visible = false;
+        if(snapLines.z) snapLines.z.visible = false;
+    }
+
+    // --- ОБНОВЛЕНИЕ ТУЛТИПА ---
+    if (tooltip) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+        
+        // Показываем красивые округленные цифры
+        // Если стикер: показываем % (например 25%)
+        // Если 3D: показываем мм (например X: 12)
+        if (firstObj.placement === 'side') {
+            tooltip.innerText = `Pos: ${Math.round(firstObj.x * 100)}% | H: ${Math.round(firstObj.y * 100)}%`;
+        } else {
+            tooltip.innerText = `X: ${Math.round(firstObj.x)} Y: ${Math.round(firstObj.y)} Z: ${Math.round(firstObj.z)}`;
+        }
+    }
+    
+    rebuildScene();
+}
+
+function getActiveTiers() { return cakes[activeCakeId]; }
+function closeSheet() { document.getElementById('bottom-sheet').classList.remove('open'); ui.activeMenu = null; }
+function recordHistory() { if (historyPtr < history.length - 1) history = history.slice(0, historyPtr + 1); history.push(JSON.stringify(cakes)); if (history.length > 30) history.shift(); else historyPtr++; if(viewMode === 'both') renderCompareTable(); }
+function undo() { if (historyPtr > 0) { historyPtr--; cakes = JSON.parse(history[historyPtr]); rebuildScene(); if(ui.activeMenu) openMenu(ui.activeMenu); if(viewMode === 'both') renderCompareTable(); } }
+function redo() { if (historyPtr < history.length - 1) { historyPtr++; cakes = JSON.parse(history[historyPtr]); rebuildScene(); if(ui.activeMenu) openMenu(ui.activeMenu); if(viewMode === 'both') renderCompareTable(); } }
+function moveTier(dir) { if (ui.selTier === null) return; const tiers = getActiveTiers(); const newIdx = ui.selTier + dir; if (newIdx < 0 || newIdx >= tiers.length) return; [tiers[ui.selTier], tiers[newIdx]] = [tiers[newIdx], tiers[ui.selTier]]; ui.selTier = newIdx; rebuildScene(); openMenu('structure_edit'); recordHistory(); }
+function actionAddTier() { getActiveTiers().push({id:Date.now(), shape:'cylinder', d:200, h:100, n:6, w:200, dep:200, color:'#ffffff', weight:2, filling:'Ваниль', decor:[], tex:{side:defaultTex(),top:defaultTex(),bottom:defaultTex()}}); ui.selTier = getActiveTiers().length - 1; rebuildScene(); openMenu('structure_edit'); recordHistory(); }
+function selectAndEditTier(idx) { ui.selTier = idx; rebuildScene(); openMenu('structure_edit'); }
+function previewTierColor(val) { if(ui.selTier === null) return; const t = getActiveTiers()[ui.selTier]; t.color = val; rebuildScene(); }
+function duplicateTier() { if(ui.selTier!==null){ getActiveTiers().push(JSON.parse(JSON.stringify(getActiveTiers()[ui.selTier]))); ui.selTier=getActiveTiers().length-1; rebuildScene(); openMenu('structure_edit'); recordHistory(); }}
+function removeTier() { if(ui.selTier!==null){ getActiveTiers().splice(ui.selTier,1); ui.selTier=null; rebuildScene(); closeSheet(); recordHistory(); }}
+function getShapeName(s) { const n={cylinder:'Цилиндр',box:'Куб',sphere:'Шар',ngon:'Многоугольник',heart:'Сердце',star:'Звезда',parallelepiped:'Параллелепипед'}; return n[s]||s; }
+function textToImg(txt, font, color) { 
+    const cvs = document.createElement('canvas'); 
+    const ctx = cvs.getContext('2d'); 
+    
+    // ОЧЕНЬ БОЛЬШОЙ РАЗМЕР для четкости
+    const fontSize = 200; 
+    const fontStr = "bold " + fontSize + "px " + (font || 'Inter');
+    
+    // 1. Измеряем текст
+    ctx.font = fontStr; 
+    const lines = txt.split('\n'); 
+    let maxW = 0; 
+    lines.forEach(l => maxW = Math.max(maxW, ctx.measureText(l).width)); 
+    
+    // 2. Делаем огромный отступ (padding), чтобы хвосты букв (g, y, f) не обрезались
+    const lineHeight = fontSize * 1.5;
+    const padding = fontSize; // Отступ равен размеру буквы
+    
+    cvs.width = maxW + (padding * 2); 
+    cvs.height = (lines.length * lineHeight) + padding; 
+    
+    // 3. Рисуем
+    ctx.font = fontStr; 
+    ctx.textBaseline = 'middle'; 
+    ctx.textAlign = 'center'; 
+    ctx.fillStyle = color || '#000000'; 
+    
+    // Центр холста
+    const cx = cvs.width / 2;
+    const cy = cvs.height / 2;
+    
+    // Коррекция вертикали (чтобы текст был ровно по центру)
+    const totalTextH = lines.length * lineHeight;
+    const startY = cy - (totalTextH / 2) + (lineHeight / 2);
+
+    lines.forEach((l, i) => {
+        ctx.fillText(l, cx, startY + (i * lineHeight)); 
+    }); 
+    
+    return cvs.toDataURL('image/png'); 
+}
+
+// Эта функция теперь УМЕЕТ ЖДАТЬ загрузку шрифта
+async function updateDecorTextProp(key, val) {
+    if(ui.selTier===null || ui.selDecorIdx===null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    if(!d.isText) return;
+
+    if(key === 'fontCustom') {
+        d.font = val;
+        loadFont(val);
+    } else {
+        d[key] = val;
+        if(key === 'font') loadFont(val);
+    }
+
+    // 1. Формируем строку шрифта для проверки
+    const fontStr = "100px " + d.font;
+
+    try {
+        // 2. ЖДЕМ ЗАГРУЗКИ (Магия здесь)
+        await document.fonts.load(fontStr);
+        // Если дошли сюда — шрифт точно загружен
+    } catch (e) {
+        console.log('Ошибка ожидания шрифта, рисуем как есть');
+    }
+
+    // 3. Рисуем картинку
+    d.url = textToImg(d.textContent, d.font, d.color);
+    
+    // 4. АВТО-РАЗМЕР (Чтобы не было сплющивания)
+    const img = new Image();
+    img.onload = function() {
+        if (d.lockAspect !== false) {
+            const ratio = img.width / img.height;
+            // Если топпер, фиксируем высоту (например 40мм) и подгоняем ширину
+            // Если ширина выходит слишком большой (больше диаметра торта), можно ограничить
+            d.w = Math.round(d.h * ratio);
+        }
+        rebuildScene();
+        if(ui.activeMenu === 'decor') openMenu('decor'); // Обновляем цифры
+    };
+    img.src = d.url;
+    
+    rebuildScene();
+}
+
+function addTextDec() { const txt = document.getElementById('new-txt').value; if(!txt) return; const url = textToImg(txt, 'Inter', '#ec4899'); const t = getActiveTiers()[ui.selTier]; t.decor.push({type:'sticker', url:url, w:50, h:20, x:0, y:0.5, isText:true, textContent:txt, color:'#ec4899'}); rebuildScene(); closeSheet(); recordHistory(); }
+function handleFile(inp) { if(!inp.files[0] || ui.selTier===null) return; compressImage(inp.files[0], 1024, (b64) => { getActiveTiers()[ui.selTier].decor.push({type:'sticker', url:b64, w:50, h:50, x:0, y:0.5}); rebuildScene(); closeSheet(); recordHistory(); }); }
+
+function takeScreenshot() {
+    // 1. ЗАПОМИНАЕМ ТЕКУЩИЕ РАЗМЕРЫ И ФОН
+    const oldSize = new THREE.Vector2();
+    renderer.getSize(oldSize);
+    const oldBg = scene.background;
+
+    // 2. НАСТРАИВАЕМ СЦЕНУ
+    // Ставим светло-серый фон (чтобы белые цифры не сливались)
+    scene.background = new THREE.Color(0xf0f2f5);
+
+    // Включаем видимость плашек с размерами
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.type === 'infoLabel') obj.visible = true;
+    });
+
+    // Обновляем мир, чтобы плашки точно встали на свои места
+    scene.updateMatrixWorld(true);
+
+    // 3. УВЕЛИЧИВАЕМ РАЗРЕШЕНИЕ (High Quality)
+    // Умножаем размер вашего экрана на 3. 
+    // Это даст четкую картинку, но сохранит ТОЧНО ТОТ ЖЕ ракурс, что вы видите.
+    const multiplier = 3; 
+    renderer.setSize(oldSize.x * multiplier, oldSize.y * multiplier);
+
+    // 4. ОБНОВЛЯЕМ ТЕНИ
+    // Обязательно, чтобы торт не стал плоским на новом разрешении
+    renderer.shadowMap.needsUpdate = true;
+
+    // 5. РЕНДЕР И СОХРАНЕНИЕ
+    renderer.render(scene, camera);
+
+    const dateStr = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}).replace(':','-');
+    const a = document.createElement('a');
+    a.download = `cake_view_${dateStr}.png`;
+    a.href = renderer.domElement.toDataURL('image/png', 1.0);
+    a.click();
+
+    // 6. ВОЗВРАЩАЕМ ВСЁ КАК БЫЛО
+    // Скрываем плашки обратно
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.type === 'infoLabel') obj.visible = false;
+    });
+
+    // Возвращаем старый фон
+    scene.background = oldBg;
+    
+    // Возвращаем обычный размер экрана (чтобы телефон не тормозил)
+    renderer.setSize(oldSize.x, oldSize.y);
+    
+    // Финальный рендер для пользователя
+    renderer.shadowMap.needsUpdate = true;
+    renderer.render(scene, camera);
+}
+
+function saveProject(customName) { 
+    const name = customName || 'cake_project';
+    const b=new Blob([JSON.stringify(cakes)],{type:"application/json"}); 
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download = name + ".json"; a.click(); 
+}
+function loadProject() { const i=document.createElement('input'); i.type='file'; i.onchange=e=>{const r=new FileReader(); r.onload=ev=>{cakes=JSON.parse(ev.target.result); rebuildScene(); recordHistory();}; r.readAsText(e.target.files[0]);}; i.click(); }
+
+/* --- NEW COPY FUNCTION --- */
+function copyCakeToOther() {
+    const srcId = activeCakeId;
+    const destId = (srcId === 0) ? 1 : 0;
+    const srcName = (srcId === 0) ? 'A' : 'B';
+    const destName = (srcId === 0) ? 'B' : 'A';
+
+    if(confirm(`Вы уверены, что хотите скопировать Торт ${srcName} в Торт ${destName}?\nВсе данные Торта ${destName} будут заменены.`)) {
+        cakes[destId] = JSON.parse(JSON.stringify(cakes[srcId]));
+        rebuildScene();
+        recordHistory(); 
+        alert(`Торт ${srcName} успешно скопирован в ${destName}!`);
+        closeSheet();
+    }
+}
+/* --- DECOR EXTENSIONS --- */
+let tempDecorType = 'side'; // 'side', 'top', 'topper'
+
+function promptAddDecor(type) {
+    if(ui.selTier === null) { alert('Сначала выберите ярус!'); return; }
+    tempDecorType = type;
+    
+    // Показываем выбор прямо в меню
+    const content = document.getElementById('sheet-content');
+    content.innerHTML = `
+        <div class="sheet-header" style="padding-left:0; border:none">
+            <button class="back-btn" onclick="openMenu('decor')">← Назад</button>
+            <div class="sheet-title">Что добавить?</div>
+        </div>
+        <div class="btn-grid" style="margin-top:20px">
+            <button class="btn-full" onclick="initAddDecor('img')">🖼 Картинка</button>
+            <button class="btn-full" onclick="initAddDecor('text')">🔤 Текст</button>
+        </div>
+        <input type="file" id="decor-upl" style="display:none" onchange="finishAddDecor(this)">
+    `;
+}
+
+function initAddDecor(sourceType) {
+    if (sourceType === 'img') {
+        const fileInput = document.getElementById('decor-upl');
+        if(fileInput) fileInput.click();
+        else alert('Ошибка: элемент загрузки не найден');
+    } else {
+        const txt = prompt("Введите текст надписи:");
+        if(txt) {
+            // Генерируем картинку из текста (ЧЕРНЫЙ ЦВЕТ #000000)
+            createDecorItem(textToImg(txt, 'Inter', '#000000'), true, txt);
+        } else {
+            openMenu('decor'); // Отмена
+        }
+    }
+}
+
+function finishAddDecor(inp) {
+    if(!inp.files[0]) return;
+    compressImage(inp.files[0], 1024, (b64) => { createDecorItem(b64, false); });
+    inp.value = '';
+}
+
+function createDecorItem(url, isText, textContent) {
+    const t = getActiveTiers()[ui.selTier];
+    
+    let initX = 0, initY = 0, initZ = 0;
+    if (tempDecorType === 'side') { initY = 0.5; initX = 0.5; } 
+
+    const item = { 
+        url: url, placement: tempDecorType, 
+        w: (isText ? 80 : 50), h: (isText ? 30 : 50), rot: 0, 
+        x: initX, y: initY, z: initZ,
+        // Новые поля для текста
+        isText: isText || false,
+        textContent: textContent || '',
+        font: 'Inter',
+        color: '#000000',
+        
+        tintColor: '#ffffff' // <--- ДОБАВИЛИ ВОТ ЭТО
+    };
+    
+    t.decor.push(item);
+    ui.selDecorIdx = t.decor.length - 1;
+    rebuildScene();
+    openMenu('decor');
+    recordHistory();
+}
+
+function selectDecor(idx) {
+    ui.selDecorIdx = idx;
+    rebuildScene();
+    openMenu('decor');
+}
+
+function removeDecor(idx) {
+    getActiveTiers()[ui.selTier].decor.splice(idx, 1);
+    ui.selDecorIdx = null;
+    rebuildScene();
+    openMenu('decor');
+    recordHistory();
+}
+
+/* --- УНИВЕРСАЛЬНОЕ ДВИЖЕНИЕ (ОТНОСИТЕЛЬНО КАМЕРЫ) --- */
+/* --- УНИВЕРСАЛЬНОЕ ДВИЖЕНИЕ (ОТНОСИТЕЛЬНО КАМЕРЫ) --- */
+function moveDecor(dir) {
+    if(ui.selTier === null) return;
+    
+    // ОПРЕДЕЛЯЕМ ЦЕЛИ ДЛЯ ДВИЖЕНИЯ
+    let targets = [];
+    const tier = getActiveTiers()[ui.selTier];
+
+    // 1. Приоритет: Мульти-выбор (галочки)
+    if (isMultiSelect && selectedDecors.length > 0) {
+        targets = selectedDecors.map(i => tier.decor[i]);
+    } 
+    // 2. Иначе: Одиночный выбор + СИММЕТРИЯ
+    else if (ui.selDecorIdx !== null) {
+        const current = tier.decor[ui.selDecorIdx];
+        
+        // ЕСТЬ ЛИ У ОБЪЕКТА СИММЕТРИЯ?
+        if (current.symId) {
+            // Находим всех братьев с таким же symId
+            targets = tier.decor.filter(d => d.symId === current.symId);
+        } else {
+            // Нет симметрии, двигаем один
+            targets = [current];
+        }
+    }
+
+    if (targets.length === 0) return;
+
+    // ОБЩИЕ ПАРАМЕТРЫ СКОРОСТИ
+    const stepMove = 5;       // мм для 3D объектов
+    const stepH = 2;          // мм высоты
+    const stepRot = 5;        // градусы поворота
+    const stepSide = 0.01;    // шаг для стикеров по кругу
+    const stepSideH = 0.02;   // шаг высоты для стикеров
+    const stepDepth = 1;      // шаг глубины (вдавливания)
+
+    // Угол камеры один для всех
+    const camAng = controls.getAzimuthalAngle();
+    const sin = Math.sin(camAng);
+    const cos = Math.cos(camAng);
+
+    // Вектор нажатия
+    let sx = 0, sz = 0, sy = 0;
+    if(dir === 'left') sx = -1;
+    if(dir === 'right') sx = 1;
+    if(dir === 'up') sy = 1;
+    if(dir === 'down') sy = -1;
+    if(dir === 'in') sz = -1;   
+    if(dir === 'out') sz = 1;  
+
+    // ПРИМЕНЯЕМ ДВИЖЕНИЕ КО ВСЕМ ЦЕЛЯМ
+    targets.forEach(d => {
+        if (d.locked) return; // Пропускаем заблокированные объекты, даже если они выделены
+
+        // Вращение
+        if(dir === 'rotCW') { d.rot = (d.rot || 0) - stepRot; return; }
+        if(dir === 'rotCCW') { d.rot = (d.rot || 0) + stepRot; return; }
+
+        if (d.placement === 'side') {
+            // ДВИЖЕНИЕ ДЛЯ СТИКЕРОВ НА БОКУ
+            if (sy !== 0) d.y = (d.y || 0) + (sy * stepSideH);
+            if (sz !== 0) d.z = (d.z || 0) + (sz * stepDepth); 
+
+            if (sx !== 0) {
+                // Умный поворот влево/вправо в зависимости от взгляда камеры
+                const decorAng = (d.x || 0) * Math.PI * 2; 
+                const viewFactor = Math.cos(camAng - decorAng); 
+                const direction = (viewFactor >= 0) ? 1 : -1;
+                
+                d.x = ((d.x || 0) + (sx * stepSide * direction));
+                // Зацикливаем 0..1
+                if(d.x > 1) d.x -= 1; 
+                if(d.x < 0) d.x += 1;
+            }
+        } else {
+            // ДВИЖЕНИЕ ДЛЯ 3D ОБЪЕКТОВ (Топперы, Фигуры, Картинки сверху)
+            if (sy !== 0) d.y = (d.y || 0) + (sy * stepH);
+            
+            if (sx !== 0 || sz !== 0) {
+                // Поворот вектора движения относительно камеры
+                const moveX = (sx * stepMove * cos) + (sz * stepMove * sin);
+                const moveZ = -(sx * stepMove * sin) + (sz * stepMove * cos); 
+                
+                d.x = (d.x || 0) + moveX;
+                d.z = (d.z || 0) + moveZ;
+            }
+        }
+    });
+
+    rebuildScene();
+}
+/* --- SIZE & ASPECT RATIO LOGIC --- */
+function toggleAspect(checked) {
+    ui.lockAspect = checked;
+}
+
+function updateDecorDim(key, val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    // Превращаем ввод в число. Если стерли всё (пусто) — считаем как 0
+    let numVal = parseFloat(val);
+    if(isNaN(numVal)) numVal = 0;
+
+    if (key === 'rot') {
+        d.rot = numVal;
+        const range = document.querySelector('input[type=range]');
+        if(range) range.value = numVal;
+    } else {
+        // --- ЛОГИКА СОХРАНЕНИЯ ПРОПОРЦИЙ ---
+        
+        // 1. Если размеры валидные (>0), запоминаем "золотое соотношение" этого декора
+        // Мы делаем это ПЕРЕД тем, как применить новое значение (которое может быть 0)
+        if (d.w > 0 && d.h > 0) {
+            d._ratio = d.w / d.h;
+        }
+        // Если пропорции еще не сохранены, считаем их 1:1
+        if (!d._ratio) d._ratio = 1;
+
+        // 2. Применяем введенное значение к текущему полю
+        d[key] = numVal;
+
+        // 3. Если стоит галочка "Сохранять пропорции"
+        if (ui.lockAspect && (key === 'w' || key === 'h')) {
+            
+            // ВАЖНЫЙ МОМЕНТ: Меняем второе поле ТОЛЬКО если введенное число > 0.
+            // Если пользователь стер поле (numVal = 0), второе поле мы НЕ трогаем.
+            // Оно останется висеть со старым значением, пока вы не впишете новую цифру.
+            if (numVal > 0) {
+                if (key === 'w') { 
+                    d.h = Math.round(numVal / d._ratio); 
+                } else { 
+                    d.w = Math.round(numVal * d._ratio); 
+                }
+            }
+        }
+        
+        // 4. Обновляем цифры ВО ВСЕХ инпутах (чтобы они синхронизировались с реальностью)
+        const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+        inputs.forEach(inp => {
+            const action = inp.getAttribute('oninput');
+            if (!action) return;
+
+            // Если это поле ширины ('w') — ставим туда актуальную ширину из объекта (d.w)
+            if (action.includes("'w'")) {
+                inp.value = (d.w > 0 ? d.w : '');
+            }
+            
+            // Если это поле высоты ('h') — ставим туда актуальную высоту из объекта (d.h)
+            if (action.includes("'h'")) {
+                inp.value = (d.h > 0 ? d.h : '');
+            }
+        });
+    }
+    
+    rebuildScene();
+    // openMenu НЕ вызываем, чтобы фокус не слетал
+}
+
+function stepDecorDim(key, delta) {
+    if(ui.selTier===null || ui.selDecorIdx===null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    updateDecorDim(key, (parseFloat(d[key])||0) + delta);
+}
+
+/* --- CONTINUOUS MOVEMENT LOGIC (УНИВЕРСАЛЬНАЯ) --- */
+// Проверка, чтобы не было ошибки повторного объявления
+if (typeof holdTimer === 'undefined') var holdTimer = null; 
+
+// Эта функция выполняет ЛЮБОЙ код много раз, пока держишь кнопку
+function startHold(code) {
+    if(holdTimer) clearInterval(holdTimer);
+    const func = new Function(code);
+    func(); // Срабатываем сразу при нажатии
+    holdTimer = setInterval(func, 100); // Повторяем каждые 100мс
+}
+
+function stopHold() {
+    if(holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+}
+
+// Обертки для джойстика (чтобы старые кнопки стрелок работали)
+function startMove(dir) { startHold("moveDecor('" + dir + "')"); }
+function stopMove() { stopHold(); }
+
+
+// --- НОВАЯ ФУНКЦИЯ: Принудительная загрузка шрифтов ---
+function preloadFonts() {
+    // Создаем невидимый блок
+    const hiddenDiv = document.createElement('div');
+    hiddenDiv.style.position = 'absolute'; 
+    hiddenDiv.style.top = '-9999px'; 
+    hiddenDiv.style.visibility = 'hidden';
+    document.body.appendChild(hiddenDiv);
+
+    // Для каждого шрифта создаем текст, чтобы браузер начал скачивать шрифт
+    GOOGLE_FONTS.forEach(font => {
+        const span = document.createElement('span');
+        span.style.fontFamily = font;
+        span.textContent = 'Preload'; // Любой текст
+        hiddenDiv.appendChild(span);
+    });
+    
+    // Ждем секунду и перерисовываем сцену (на случай, если что-то уже открыто)
+    setTimeout(() => rebuildScene(), 1000);
+}
+// Функция лечит сплющивание
+function autoSizeDecor() {
+    if(ui.selTier===null || ui.selDecorIdx===null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    // Загружаем картинку, чтобы узнать её реальные размеры
+    const img = new Image();
+    img.onload = function() {
+        const ratio = img.width / img.height;
+        // Меняем ширину 3D-объекта, чтобы она соответствовала картинке
+        d.w = d.h * ratio; 
+        
+        rebuildScene(); 
+        openMenu('decor'); // Обновляем цифры в меню
+    };
+    img.src = d.url;
+}
+
+// Вспомогательная функция для переноса текста по словам
+function wrapText(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    let lines = [];
+    let currentLine = words[0];
+
+    for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = ctx.measureText(currentLine + " " + word).width;
+        if (width < maxWidth) {
+            currentLine += " " + word;
+        } else {
+            lines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    lines.push(currentLine);
+    return lines;
+}
+
+/* --- ГЕНЕРАТОР ПЛАШЕК (ВЕРТИКАЛЬНЫЙ ПЕРЕНОС) --- */
+function createInfoSprite(t) {
+    // 1. НАСТРОЙКИ
+    const fixedCanvasW = 500; // Жесткая ширина плашки
+    const paddingX = 40;      // Отступы по бокам
+    const paddingY = 40;      // Отступы сверху и снизу
+    const gap = 20;           // Отступ между блоками текста
+    const maxTextW = fixedCanvasW - (paddingX * 2); // Макс. ширина текста для переноса
+
+    // Шрифты и их высоты строк (line-height)
+    const titleFont = "bold 56px Inter, sans-serif"; const titleLH = 70;
+    const bodyFont = "48px Inter, sans-serif";       const bodyLH = 60;
+    const infoFont = "italic 44px Inter, sans-serif"; const infoLH = 55;
+
+    // Тексты
+    const dimText = (t.shape === 'box') ? `◼ ${t.d/10}x${t.d/10} см` : 
+                    (t.shape === 'parallelepiped' ? `▬ ${t.w/10}x${t.dep/10} см` : `● Ø ${t.d/10} см`);
+    const hText = `↕ Высота: ${t.h/10} см`;
+    let infoText = `${t.weight||0} кг`;
+    if(t.filling) infoText += ` | ${t.filling}`;
+
+    // 2. ПОДГОТОВКА (Разбивка на строки и расчет высоты)
+    const tempCvs = document.createElement('canvas'); const tempCtx = tempCvs.getContext('2d');
+
+    tempCtx.font = titleFont;
+    const titleLines = wrapText(tempCtx, dimText, maxTextW);
+    const titleH = titleLines.length * titleLH;
+
+    tempCtx.font = bodyFont;
+    const bodyLines = wrapText(tempCtx, hText, maxTextW);
+    const bodyH = bodyLines.length * bodyLH;
+
+    tempCtx.font = infoFont;
+    const infoLines = wrapText(tempCtx, infoText, maxTextW);
+    const infoH = infoLines.length * infoLH;
+
+    // Вычисляем общую высоту канваса
+    const canvasH = paddingY + titleH + gap + bodyH + gap + infoH + paddingY;
+
+    // 3. РИСОВАНИЕ
+    const cvs = document.createElement('canvas');
+    cvs.width = fixedCanvasW; 
+    cvs.height = canvasH;
+    const ctx = cvs.getContext('2d');
+
+    // Фон и рамка
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); 
+    ctx.roundRect(10, 10, fixedCanvasW-20, canvasH-20, 40); ctx.fill();
+    ctx.strokeStyle = "#ec4899"; ctx.lineWidth = 8; ctx.stroke();
+
+    // Текст
+    ctx.fillStyle = "#333"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    let currentY = paddingY; // Стартовая позиция Y
+
+    // Блок 1: Заголовок
+    ctx.font = titleFont;
+    titleLines.forEach((line, i) => {
+        ctx.fillText(line, paddingX, currentY + (i * titleLH) + titleLH/2);
+    });
+    currentY += titleH + gap;
+
+    // Блок 2: Высота
+    ctx.font = bodyFont;
+    bodyLines.forEach((line, i) => {
+        ctx.fillText(line, paddingX, currentY + (i * bodyLH) + bodyLH/2);
+    });
+    currentY += bodyH + gap;
+
+    // Блок 3: Инфо
+    ctx.fillStyle = "#666"; ctx.font = infoFont;
+    infoLines.forEach((line, i) => {
+        ctx.fillText(line, paddingX, currentY + (i * infoLH) + infoLH/2);
+    });
+
+    // 4. СОЗДАНИЕ СПРАЙТА
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    
+    // ВЕРНУЛИ ОБЫЧНЫЙ МАТЕРИАЛ (Убрали depthTest: false)
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true }); 
+    const sprite = new THREE.Sprite(mat);
+    
+    // ТЕПЕРЬ ФИКСИРУЕМ ШИРИНУ В 3D
+    const worldScaleW = 150; 
+    const worldScaleH = worldScaleW * (canvasH / fixedCanvasW); 
+    
+    sprite.scale.set(worldScaleW, worldScaleH, 1);
+    
+    // Убрали renderOrder = 999, он больше не нужен
+    sprite.visible = false; 
+    sprite.userData = { type: 'infoLabel' }; 
+    return sprite;
+}
+/* --- НОВЫЕ ФУНКЦИИ: МАТЕРИАЛЫ И ПОДТЕКИ --- */
+
+// 1. Генератор текстуры шума (для Велюра)
+function createNoiseTexture() {
+    const size = 512; const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#808080'; ctx.fillRect(0,0,size,size);
+    const data = ctx.getImageData(0,0,size,size); const buffer = data.data;
+    for(let i=0; i<buffer.length; i+=4) {
+        const val = (Math.random() - 0.5) * 40; // Сила шума
+        buffer[i] += val; buffer[i+1] += val; buffer[i+2] += val;
+    }
+    ctx.putImageData(data, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);
+    return tex;
+}
+const NOISE_TEX = createNoiseTexture(); // Создаем один раз
+
+// 2. Генератор подтеков (Шоколад)
+// 2. Генератор подтеков (Цилиндр + Куб)
+// 2. Генератор подтеков (Разная толщина)
+function createDrips(shape, w, d, color, len, freq) {
+    const grp = new THREE.Group();
+    
+    // Базовая толщина ободка (верхней каемки)
+    const rimR = 0.7; 
+    
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: color, roughness: 0.3, metalness: 0.1 
+    });
+
+    // --- ЦИЛИНДР / КРУГ ---
+    if (shape === 'cylinder' || shape === 'sphere') {
+        const r = w; 
+        
+        // Ободок (Ровный, чтобы было аккуратно)
+        const rim = new THREE.Mesh(
+            new THREE.TorusGeometry(r + rimR*0.5, rimR, 8, 32), 
+            mat
+        );
+        rim.rotation.x = Math.PI / 2;
+        grp.add(rim);
+
+        // Капли
+        const count = freq || 12; 
+        for(let i=0; i<count; i++) {
+            const angle = (i / count) * Math.PI * 2 + (Math.random() * 0.5); // Немного хаоса в позиции
+            
+            // 1. Рандомная длина
+            const dropLen = (len || 40) * (0.6 + Math.random() * 0.7);
+            
+            // 2. РАНДОМНАЯ ШИРИНА (от 0.4 до 0.9 радиус)
+            const dropR = 0.4 + Math.random() * 0.5;
+
+            // Сама капля
+            const drop = new THREE.Mesh(new THREE.CylinderGeometry(dropR, dropR, dropLen, 8), mat);
+            drop.geometry.translate(0, -dropLen/2, 0);
+            
+            // Позиция
+            drop.position.set(Math.cos(angle) * (r + rimR*0.5), 0, Math.sin(angle) * (r + rimR*0.5));
+            
+            // Кончик (Сфера)
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(dropR, 8, 8), mat);
+            tip.position.y = -dropLen;
+            drop.add(tip);
+            
+            grp.add(drop);
+        }
+    } 
+    // --- КУБ / ПАРАЛЛЕЛЕПИПЕД ---
+    else if (shape === 'box' || shape === 'parallelepiped') {
+        const hw = w/2; const hd = d/2;
+        
+        // Ободок (4 прямые трубки)
+        const path = [
+            {x:0, z:hd, w:w}, {x:0, z:-hd, w:w},
+            {x:hw, z:0, w:d, rot:true}, {x:-hw, z:0, w:d, rot:true}
+        ];
+        path.forEach(p => {
+            const bar = new THREE.Mesh(new THREE.CylinderGeometry(rimR, rimR, p.w + rimR*2, 8), mat);
+            bar.rotation.z = Math.PI/2; 
+            if(p.rot) bar.rotation.y = Math.PI/2;
+            bar.position.set(p.x, 0, p.z);
+            grp.add(bar);
+        });
+
+        // Капли
+        const perimeter = (w + d) * 2;
+        const count = Math.floor(perimeter / (150 / (freq/10)));
+        
+        for(let i=0; i<count; i++) {
+            const side = Math.floor(Math.random() * 4);
+            const offset = (Math.random() - 0.5); 
+            let px=0, pz=0;
+            
+            if(side===0) { px = offset * w; pz = hd + rimR/2; } 
+            else if(side===1) { px = offset * w; pz = -hd - rimR/2; }
+            else if(side===2) { px = hw + rimR/2; pz = offset * d; } 
+            else { px = -hw - rimR/2; pz = offset * d; }
+
+            // Рандомная длина и ширина
+            const dropLen = (len || 40) * (0.6 + Math.random() * 0.7);
+            const dropR = 0.4 + Math.random() * 0.5; // Тут тоже рандом
+
+            const drop = new THREE.Mesh(new THREE.CylinderGeometry(dropR, dropR, dropLen, 8), mat);
+            drop.geometry.translate(0, -dropLen/2, 0);
+            drop.position.set(px, 0, pz);
+            
+            const tip = new THREE.Mesh(new THREE.SphereGeometry(dropR, 8, 8), mat);
+            tip.position.y = -dropLen;
+            drop.add(tip);
+            
+            grp.add(drop);
+        }
+    }
+
+    return grp;
+}
+
+/* --- ЛОГИКА ПОДТЕКОВ --- */
+function toggleDrips(enabled) {
+    if(ui.selTier===null) return;
+    const t = getActiveTiers()[ui.selTier];
+    if(!t.drips) t.drips = { color: '#3e2723', len: 40, freq: 12 };
+    t.drips.enabled = enabled;
+    rebuildScene(); openMenu('color'); recordHistory();
+}
+
+function updateDrips(key, val) {
+    if(ui.selTier===null) return;
+    const t = getActiveTiers()[ui.selTier];
+    if(key === 'len' || key === 'freq') val = parseInt(val);
+    t.drips[key] = val;
+    // Используем "умное обновление" без перерисовки меню для инпутов
+    if(key !== 'color') {
+        const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+        inputs.forEach(inp => {
+            const attr = inp.getAttribute('oninput');
+            if(attr && attr.includes(`'${key}'`)) inp.value = val;
+        });
+    }
+    rebuildScene(); recordHistory();
+}
+
+function stepDrips(key, delta) {
+    if(ui.selTier===null) return;
+    const t = getActiveTiers()[ui.selTier];
+    let val = (t.drips[key] || 0) + delta;
+    if(val < 1) val = 1;
+    updateDrips(key, val);
+}
+
+/* --- КОПИРОВАНИЕ ДЕКОРА --- */
+function duplicateDecor() {
+    if(ui.selTier===null) return;
+    const tier = getActiveTiers()[ui.selTier];
+
+    // Кого копируем?
+    let indicesToCopy = [];
+    if (isMultiSelect && selectedDecors.length > 0) {
+        indicesToCopy = [...selectedDecors]; // Копия массива индексов
+        selectedDecors = []; // Сбрасываем выбор, чтобы выделить НОВЫЕ копии
+    } else if (ui.selDecorIdx !== null) {
+        indicesToCopy = [ui.selDecorIdx];
+    } else {
+        return;
+    }
+
+    const newIndices = [];
+    
+    indicesToCopy.forEach(idx => {
+        const src = tier.decor[idx];
+        const copy = JSON.parse(JSON.stringify(src));
+        
+        // Сдвигаем копию
+        if (copy.placement === 'side') {
+            copy.x = (copy.x || 0) + 0.05;
+        } else {
+            copy.x = (copy.x || 0) + 20; 
+            copy.z = (copy.z || 0) + 20;
+        }
+        
+        tier.decor.push(copy);
+        newIndices.push(tier.decor.length - 1);
+    });
+
+    // Если был мульти-режим, выделяем новые копии
+    if (isMultiSelect) {
+        selectedDecors = newIndices;
+    } else {
+        ui.selDecorIdx = newIndices[0];
+    }
+
+    rebuildScene();
+    openMenu('decor');
+    recordHistory();
+}
+
+// 2. Отправить в другой торт (ФИНАЛЬНАЯ ВЕРСИЯ - БЕЗ ЛИШНЕЙ ПОДСВЕТКИ)
+function copyDecorToOther() {
+    if(ui.selTier===null || ui.selDecorIdx===null) return;
+    
+    // 1. Определяем цель
+    const targetId = (activeCakeId === 0) ? 1 : 0;
+    
+    // 2. Проверка данных
+    if(typeof cakes === 'undefined' || !cakes[targetId]) {
+        console.error("Ошибка: cakes не найден"); return;
+    }
+    const targetTiers = cakes[targetId].tiers || cakes[targetId];
+    if(!targetTiers || targetTiers.length === 0) {
+        alert("Второй торт пустой! Добавьте ярус."); return;
+    }
+
+    // 3. Копируем данные
+    const srcTier = getActiveTiers()[ui.selTier];
+    const srcDecor = srcTier.decor[ui.selDecorIdx];
+    const copy = JSON.parse(JSON.stringify(srcDecor));
+
+    // Выбираем ярус на новом торте
+    let targetTierIdx = ui.selTier;
+    if (targetTierIdx >= targetTiers.length) targetTierIdx = targetTiers.length - 1;
+    
+    if (!targetTiers[targetTierIdx].decor) targetTiers[targetTierIdx].decor = [];
+    
+    // Добавляем в массив
+    targetTiers[targetTierIdx].decor.push(copy);
+    const newDecorIdx = targetTiers[targetTierIdx].decor.length - 1;
+
+    // 4. ПЕРЕКЛЮЧЕНИЕ ИНТЕРФЕЙСА
+    if(typeof viewMode !== 'undefined') {
+        // Принудительно ставим одиночный режим
+        viewMode = 'single'; 
+        activeCakeId = targetId; 
+        
+        // --- ОБНОВЛЕНИЕ КНОПОК (ИСПРАВЛЕНО) ---
+        const allBtns = document.querySelectorAll('button, .tab-btn, .cake-toggle');
+        const targetChar = (targetId === 0) ? 'A' : 'B';
+
+        allBtns.forEach(btn => {
+            const txt = btn.innerText || '';
+            const onclickAttrs = btn.getAttribute('onclick') || '';
+            
+            // Работаем только с кнопками переключения тортов
+            if (txt.includes('Торт') || onclickAttrs.includes('Cake')) {
+                
+                // 1. Сначала выключаем ВСЁ
+                btn.classList.remove('active');
+                
+                // 2. Включаем только ТУ САМУЮ кнопку
+                // Условие:
+                // а) Текст содержит нужную букву (A или B) ИЛИ функция вызывает нужный ID (0 или 1)
+                // б) НО текст НЕ содержит "+" (чтобы не зажечь A+B)
+                const isTarget = (txt.includes(targetChar) || onclickAttrs.includes(`(${targetId})`));
+                const isDual = txt.includes('+') || txt.includes('A+B'); // Кнопка "Оба"
+
+                if (isTarget && !isDual) {
+                    btn.classList.add('active');
+                }
+            }
+        });
+    }
+    
+    // 5. Устанавливаем выделение
+    ui.selTier = targetTierIdx;
+    ui.selDecorIdx = newDecorIdx;
+    
+    // 6. Обновляем сцену и меню
+    rebuildScene();
+    setTimeout(() => {
+        openMenu('decor');
+    }, 0);
+}
+
+/* --- ФУНКЦИИ ДЛЯ ПОДЛОЖКИ (BOARD) --- */
+/* --- ФУНКЦИИ ДЛЯ ПОДЛОЖКИ (BOARD) --- */
+function toggleBoard(checked) {
+    if (ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    // isRound: true по умолчанию, как вы просили
+    if (!t.board) t.board = { enabled: true, isRound: true, color: '#ffffff', thickness: 3, offset: 20 };
+    t.board.enabled = checked;
+    rebuildScene();
+    openMenu('structure_edit'); 
+    recordHistory();
+}
+
+function updateBoardProp(key, val) {
+    if (ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    if (!t.board) return;
+    
+    // Если пришло boolean значение (от чекбокса), сохраняем как есть
+    if (typeof val === 'boolean') {
+        t.board[key] = val;
+    } else {
+        // Иначе парсим число
+        if (key === 'thickness' || key === 'offset') val = parseFloat(val);
+        t.board[key] = val;
+    }
+    
+    if (key !== 'color' && typeof val !== 'boolean') {
+        const inputs = document.querySelectorAll('#sheet-content input[type=number]');
+        inputs.forEach(inp => {
+            const attr = inp.getAttribute('oninput');
+            if (attr && attr.includes(`'${key}'`)) inp.value = val;
+        });
+    }
+    rebuildScene();
+    recordHistory();
+}
+
+function stepBoardProp(key, delta) {
+    if (ui.selTier === null) return;
+    const t = getActiveTiers()[ui.selTier];
+    if (!t.board) return;
+    let val = (t.board[key] || 0) + delta;
+    if (val < 0) val = 0;
+    updateBoardProp(key, val);
+}
+
+/* --- ФУНКЦИЯ ЭКСПОРТА В AR --- */
+/* --- ФИНАЛЬНАЯ ФУНКЦИЯ ЭКСПОРТА (С Именем и Выбором) --- */
+async function exportAR(format) {
+    // 1. ПОЛУЧАЕМ ИМЯ ИЗ ИНПУТА
+    const nameInput = document.getElementById('export-name');
+    let fileName = nameInput ? nameInput.value : 'cake_ar';
+    // Убираем расширение, если пользователь его случайно написал
+    fileName = fileName.replace(/\.(glb|usdz)$/i, '');
+    if (!fileName) fileName = 'cake_ar';
+
+    // 2. ИЩЕМ НУЖНЫЙ ТОРТ
+    // 2. ИЩЕМ ОБЪЕКТ(Ы) ТОРТА
+    let sourceObj;
+    if (viewMode === 'single') {
+        // Если выбран один торт — берем только его
+        sourceObj = group.children[activeCakeId === 0 ? 0 : (group.children.length > 1 ? 1 : 0)];
+    } else {
+        // Если выбран режим A+B — экспортируем всю группу целиком
+        sourceObj = group;
+    }
+    
+    if (!sourceObj || (sourceObj.children && sourceObj.children.length === 0)) { 
+        alert('Ошибка: Торт не найден'); return; 
+    }
+
+    // 3. ПОДГОТОВКА (Клонирование)
+    const objectToExport = sourceObj.clone();
+    
+    // ВАЖНО: Если мы экспортируем ОБА торта (viewMode === 'both'), 
+    // нам НЕ НУЖНО делать objectToExport.position.set(0, 0, 0), 
+    // иначе они встанут друг в друга. Смещение (-220 и +220) должно сохраниться.
+    if (viewMode === 'single') {
+        objectToExport.position.set(0, 0, 0);
+    }
+    
+      
+    // 4. ОЧИСТКА (Удаляем вспомогательные элементы)
+    const toRemove = [];
+    objectToExport.traverse((child) => {
+        // Удаляем обводку выделения
+        if (child.isLineSegments || child.type === 'LineSegments' || child.type === 'Line') {
+            toRemove.push(child);
+        }
+        // Удаляем плашки с размерами (они плохо выглядят в AR)
+        if (child.userData && child.userData.type === 'infoLabel') {
+            toRemove.push(child);
+        }
+    });
+    // Физическое удаление найденного мусора
+    toRemove.forEach(child => child.parent.remove(child));
+
+    // 5. МАСШТАБИРОВАНИЕ
+    // 1 unit Three.js = 1 метр AR.
+    // Торт 200мм = 0.2 метра. Уменьшаем в 1000 раз.
+    objectToExport.scale.set(0.001, 0.001, 0.001);
+    objectToExport.updateMatrixWorld();
+
+    // 6. ЭКСПОРТ В НУЖНЫЙ ФОРМАТ
+    if (format === 'usdz') {
+        // --- iPhone / iPad (.usdz) ---
+        try {
+            const exporter = new THREE.USDZExporter();
+            const arraybuffer = await exporter.parse(objectToExport);
+            const blob = new Blob([arraybuffer], { type: 'application/octet-stream' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName + '.usdz';
+            link.click();
+        } catch (e) {
+            alert('Ошибка экспорта USDZ. Проверьте консоль.');
+            console.error(e);
+        }
+        
+    } else {
+        // --- Android / Web (.glb) ---
+        try {
+            const exporter = new THREE.GLTFExporter();
+            exporter.parse(
+                objectToExport,
+                function (gltf) {
+                    const blob = new Blob([gltf], { type: 'application/octet-stream' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = fileName + '.glb';
+                    link.click();
+                },
+                { binary: true } // Обязательно binary для GLB
+            );
+        } catch (e) {
+            alert('Ошибка экспорта GLB.');
+            console.error(e);
+        }
+    }
+}
+
+function addVolumeFigure(shapeType) {
+    if(ui.selTier === null) { alert('Выберите ярус!'); return; }
+    const t = getActiveTiers()[ui.selTier];
+    
+    // Определяем читаемое название для данных
+    const readableNames = { sphere: 'Шар', cube: 'Куб', cylinder: 'Свеча' };
+
+    const item = { 
+        url: '3d_prim', 
+        placement: 'volume',
+        shape: shapeType, 
+        name: readableNames[shapeType], // Добавляем имя в объект
+        w: 30, h: 30, rot: 0, 
+        x: 0, y: 0, z: 0,
+        color: '#ffffff',
+        isText: false
+    };
+    
+    t.decor.push(item);
+    ui.selDecorIdx = t.decor.length - 1;
+    rebuildScene();
+    openMenu('decor');
+    recordHistory();
+}
+
+function updateVolumeColor(val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    if(d.placement !== 'volume') return;
+
+    d.color = val;
+    rebuildScene();
+    // Мы не перерисовываем всё меню (openMenu), чтобы ползунок цвета не "прыгал" при вводе
+    recordHistory();
+}
+
+function updateVolumeRotX(val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    // РАЗРЕШАЕМ И ТОППЕРЫ
+    if(d.placement !== 'volume' && d.placement !== 'topper') return;
+
+    d.rotX = parseFloat(val);
+    rebuildScene();
+    
+    const range = document.querySelectorAll('input[type=range]')[1]; 
+    if(range) range.value = val;
+    recordHistory();
+}
+
+function updateVolumeRot(key, val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+
+    // РАЗРЕШАЕМ И ТОППЕРЫ
+    if(d.placement !== 'volume' && d.placement !== 'topper') return; // <--- Вот тут изменение
+    
+    d[key] = parseFloat(val);
+    rebuildScene();
+    
+    // Обновляем подписи
+    const labels = document.querySelectorAll('.control-label');
+    labels.forEach(l => {
+        if(key === 'rotX' && l.innerText.includes('вперёд')) l.innerText = `Наклон вперёд/назад (${d.rotX}°)`;
+        if(key === 'rotZ' && l.innerText.includes('влево')) l.innerText = `Наклон влево/вправо (${d.rotZ}°)`;
+    });
+    recordHistory();
+}
+
+function updateVolumeRot(key, val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    d[key] = parseFloat(val);
+    rebuildScene();
+    
+    // Обновляем текст заголовков с цифрами
+    const labels = document.querySelectorAll('.control-label');
+    labels.forEach(l => {
+        if(key === 'rotX' && l.innerText.includes('вперёд')) l.innerText = `Наклон вперёд/назад (${d.rotX}°)`;
+        if(key === 'rotZ' && l.innerText.includes('влево')) l.innerText = `Наклон влево/вправо (${d.rotZ}°)`;
+    });
+    recordHistory();
+}
+
+function stepVolumeRot(key, delta) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    let val = (parseFloat(d[key]) || 0) + delta;
+    updateVolumeRot(key, val);
+    
+    // Синхронизируем ползунки визуально
+    const ranges = document.querySelectorAll('input[type=range]');
+    if (key === 'rotX' && ranges.length > 1) ranges[1].value = val;
+    if (key === 'rotZ' && ranges.length > 2) ranges[2].value = val;
+}
+
+let isCompareMinimized = false;
+
+function toggleCompare(e) {
+    if(e) e.stopPropagation(); // Чтобы не прокликивалось на сцену
+    
+    const el = document.getElementById('compare-overlay');
+    const btn = el.querySelector('.cmp-toggle-btn');
+    
+    isCompareMinimized = !isCompareMinimized;
+
+    if (isCompareMinimized) {
+        el.classList.add('minimized');
+        btn.innerHTML = '+'; // Иконка плюса
+    } else {
+        el.classList.remove('minimized');
+        btn.innerHTML = '–'; // Иконка минуса (тире)
+    }
+}
+/* --- ФУНКЦИЯ ВЫРАВНИВАНИЯ (ПО ОСЯМ) --- */
+function alignDecor(mode) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+
+    if (mode === 'centerX') {
+        d.x = 0; // Центр влево-вправо
+    } 
+    else if (mode === 'centerZ') {
+        d.z = 0; // Центр ближе-дальше
+    }
+    else if (mode === 'straight') {
+        // Сброс всех наклонов
+        d.rot = 0;   
+        d.rotX = 0;  
+        d.rotZ = 0;  
+        
+        // Сбрасываем ползунки на экране
+        const ranges = document.querySelectorAll('input[type=range]');
+        ranges.forEach(r => r.value = 0);
+    }
+
+    rebuildScene();
+    recordHistory();
+}
+
+function resetProject() {
+    if (confirm('Вы уверены, что хотите начать новый проект? \nВсе текущие изменения будут удалены безвозвратно.')) {
+        
+        // 1. Очищаем данные
+        cakes = [[], []]; // Очищаем оба торта
+        
+        // 2. Создаем дефолтный первый ярус для Торта А
+        cakes[0].push({
+            id: Date.now(), 
+            shape: 'cylinder', 
+            d: 200, h: 100, n: 6, w: 200, dep: 200, 
+            color: '#ffffff', weight: 2, filling: 'Ваниль', 
+            tex: {side:defaultTex(), top:defaultTex(), bottom:defaultTex()}, 
+            decor: []
+        });
+
+        // 3. Сбрасываем настройки интерфейса
+        activeCakeId = 0;
+        viewMode = 'single';
+        ui.selTier = 0;
+        ui.selDecorIdx = null;
+        
+        // 4. Очищаем историю (чтобы нельзя было отменить удаление проекта)
+        history = [];
+        historyPtr = -1;
+        recordHistory();
+
+        // 5. Обновляем вид
+        switchCake(0); // Переключаемся на вид одного торта
+        rebuildScene();
+        closeSheet(); // Закрываем меню
+    }
+}
+function toggleDecorLock(newState) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    d.locked = newState; // Принудительно ставим то, что передали
+    
+    // Если закрепили — сразу снимаем выделение, чтобы случайно не сдвинуть
+    if (d.locked) {
+        // ui.selDecorIdx = null; // Можно раскомментировать, если хотите, чтобы меню закрывалось сразу после закрепления
+    }
+    
+    openMenu('decor'); 
+    recordHistory();
+}
+/* --- ЛОГИКА ЛИНЕЙКИ --- */
+let rulerMode = false;
+let rulerStep = 0; // 0: ждем первую точку, 1: ждем вторую
+let rulerStart = new THREE.Vector3();
+let rulerMarkerA, rulerMarkerB, rulerLine;
+
+function toggleRuler() {
+    rulerMode = !rulerMode;
+    const btn = document.getElementById('btn-ruler');
+    const label = document.getElementById('measure-label');
+    
+    // Сбрасываем текущий замер при переключении
+    clearRulerVisuals();
+    rulerStep = 0;
+    label.style.display = 'none';
+
+    if (rulerMode) {
+        btn.classList.add('active-tool');
+        // Закрываем меню, чтобы не мешало
+        closeSheet();
+        ui.selDecorIdx = null; // Снимаем выделение с объектов
+        rebuildScene(); // Убираем рамки выделения
+        alert('Режим линейки:\n1. Нажмите первую точку.\n2. Нажмите вторую точку.\n(Чтобы выйти, нажмите иконку линейки еще раз)');
+    } else {
+        btn.classList.remove('active-tool');
+    }
+}
+
+function clearRulerVisuals() {
+    if (rulerMarkerA) { scene.remove(rulerMarkerA); rulerMarkerA = null; }
+    if (rulerMarkerB) { scene.remove(rulerMarkerB); rulerMarkerB = null; }
+    if (rulerLine) { scene.remove(rulerLine); rulerLine = null; }
+    document.getElementById('measure-label').style.display = 'none';
+    renderer.render(scene, camera);
+}
+
+function createDot(pos, color) {
+    const geo = new THREE.SphereGeometry(2, 16, 16); // Маленькая точка 2мм
+    const mat = new THREE.MeshBasicMaterial({ color: color, depthTest: false }); // depthTest: false чтобы было видно поверх всего
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.renderOrder = 999; // Рисуем поверх
+    scene.add(mesh);
+    return mesh;
+}
+
+function drawLine(p1, p2) {
+    const mat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, depthTest: false });
+    const points = [p1, p2];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geo, mat);
+    line.renderOrder = 999;
+    scene.add(line);
+    return line;
+}
+
+// Функция обновления позиции наклейки (вызывается при вращении камеры)
+function updateMeasureLabel() {
+    if (!rulerMarkerA || !rulerMarkerB) return;
+    
+    // Находим середину линии
+    const midPoint = new THREE.Vector3().addVectors(rulerMarkerA.position, rulerMarkerB.position).multiplyScalar(0.5);
+    
+    // Проецируем 3D точку в 2D координаты экрана
+    midPoint.project(camera);
+    
+    const x = (midPoint.x * .5 + .5) * window.innerWidth;
+    const y = (-(midPoint.y * .5) + .5) * window.innerHeight;
+    
+    const label = document.getElementById('measure-label');
+    label.style.left = x + 'px';
+    label.style.top = y + 'px';
+    
+}
+
+/* --- ЛОГИКА МУЛЬТИ-ВЫБОРА --- */
+function toggleMultiSelectMode() {
+    isMultiSelect = !isMultiSelect;
+    selectedDecors = []; // Сбрасываем выбор при переключении
+    if (!isMultiSelect) {
+        ui.selDecorIdx = null; // Сбрасываем и обычное выделение
+    }
+    openMenu('decor');
+    rebuildScene();
+}
+
+function toggleDecorSelection(index) {
+    const pos = selectedDecors.indexOf(index);
+    if (pos === -1) {
+        selectedDecors.push(index);
+    } else {
+        selectedDecors.splice(pos, 1);
+    }
+    rebuildScene();
+    
+    // ВАЖНО: Передаем index вторым аргументом, чтобы меню знало, кого держать в поле зрения
+    openMenu('decor', index); 
+}
+
+function groupAction(action) {
+    if (ui.selTier === null || selectedDecors.length === 0) return;
+    const tier = getActiveTiers()[ui.selTier];
+    
+    // Сортируем индексы в обратном порядке для корректного удаления
+    const sortedIndices = [...selectedDecors].sort((a,b) => b-a);
+
+    sortedIndices.forEach(idx => {
+        const d = tier.decor[idx];
+        if (action === 'lock') d.locked = true;
+        if (action === 'unlock') d.locked = false;
+        if (action === 'delete') {
+            tier.decor.splice(idx, 1);
+        }
+    });
+
+    if (action === 'delete') {
+        selectedDecors = []; // Сбрасываем выбор после удаления
+    }
+
+    rebuildScene();
+    openMenu('decor');
+    recordHistory();
+}
+/* --- ФУНКЦИЯ СОЗДАНИЯ СИММЕТРИИ --- */
+function makeSymmetry(count) {
+    if (ui.selTier === null || ui.selDecorIdx === null) {
+        alert("Выберите элемент декора!"); 
+        return;
+    }
+
+    const tier = getActiveTiers()[ui.selTier];
+    const source = tier.decor[ui.selDecorIdx];
+
+    // Генерируем уникальный ID для этой группы симметрии
+    const symId = Date.now() + '_' + Math.random();
+    
+    // Присваиваем ID исходному объекту
+    source.symId = symId;
+
+    // Создаем копии
+    for (let i = 1; i < count; i++) {
+        // Клонируем данные
+        const clone = JSON.parse(JSON.stringify(source));
+        
+        // Считаем смещение для копии
+        // Для стикеров (side) x — это прогресс 0..1 по окружности
+        if (source.placement === 'side') {
+            clone.x = (source.x + (i / count)) % 1; 
+        } 
+        // Для 3D объектов (topper, volume) нужно вращать координаты вокруг центра
+        else {
+            // Для простоты пока просто дублируем, пользователь сам растащит? 
+            // Нет, надо расставить красиво сразу.
+            // Но у нас координаты x, z линейные. Сложно рассчитать без полярных координат.
+            // ДЛЯ SIDE (Стикеры) это работает идеально сразу.
+            // ДЛЯ 3D объектов (ягоды наверху) сделаем упрощенно: 
+            // Это работает, если объект стоит не в центре (0,0).
+            
+            // Если это объект на крышке, используем "вращение вектора"
+            const angle = (i / count) * Math.PI * 2;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            
+            const x0 = source.x || 0;
+            const z0 = source.z || 0;
+            
+            // Поворот точки (x0, z0) на угол angle
+            clone.x = x0 * cos - z0 * sin;
+            clone.z = x0 * sin + z0 * cos;
+            
+            // Поворот самого объекта тоже нужен!
+            clone.rot = (source.rot || 0) - (angle * 180 / Math.PI); 
+        }
+        
+        clone.symId = symId; // Связываем с "мамой"
+        tier.decor.push(clone);
+    }
+
+    rebuildScene();
+    openMenu('decor'); // Обновляем список слоев
+    recordHistory();
+    
+    alert(`Создана симметрия x${count}! Теперь двигайте любой элемент из группы.`);
+}
+/* --- ФУНКЦИЯ УПРАВЛЕНИЯ НАПРАВЛЯЮЩИМИ --- */
+function updateSnapLines(visibleX, visibleZ, pos) {
+    // 1. Создаем линии, если их нет
+    if (!snapLines.x) {
+        const mat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent:true, opacity:0.6 }); // Красная вертикаль
+        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1000, 0)]);
+        snapLines.x = new THREE.Line(geo, mat);
+        scene.add(snapLines.x);
+    }
+    if (!snapLines.z) {
+        const mat = new THREE.LineBasicMaterial({ color: 0x0000ff, transparent:true, opacity:0.6 }); // Синяя горизонталь
+        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-1000, 0, 0), new THREE.Vector3(1000, 0, 0)]);
+        snapLines.z = new THREE.Line(geo, mat);
+        scene.add(snapLines.z);
+    }
+
+    // 2. Показываем/Скрываем и двигаем X (Вертикальная линия)
+    // Она показывает центр по X (красная линия вдоль Y)
+    if (visibleX) {
+        snapLines.x.visible = true;
+        snapLines.x.position.set(pos.x, 0, pos.z); // Ставим линию в точку объекта
+        // Но для центра X нам нужна линия, проходящая через X=0.
+        // Поэтому для "Центра" мы жестко ставим её в 0.
+        // Если вы хотите прилипать к краям, логика будет сложнее. Пока делаем ЦЕНТР.
+        snapLines.x.position.set(0, 0, 0); 
+    } else {
+        snapLines.x.visible = false;
+    }
+
+    // 3. Показываем/Скрываем Z (Линия глубины)
+    if (visibleZ) {
+        snapLines.z.visible = true;
+        snapLines.z.position.set(0, pos.y, 0); // Уровень высоты? Нет, центр стола.
+        snapLines.z.position.set(0, 0, 0);
+        snapLines.z.rotation.y = Math.PI / 2; // Поворачиваем поперек
+    } else {
+        snapLines.z.visible = false;
+    }
+}
+function updateDecorTint(val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    
+    d.tintColor = val;
+    rebuildScene();
+    // Мы не вызываем recordHistory при каждом движении ползунка цвета, чтобы не забивать память,
+    // но можно добавить, если хотите.
+}
+function renameDecor(val) {
+    if(ui.selTier === null || ui.selDecorIdx === null) return;
+    
+    const d = getActiveTiers()[ui.selTier].decor[ui.selDecorIdx];
+    d.customName = val; // Сохраняем имя
+    
+    openMenu('decor'); // Обновляем меню, чтобы новое имя появилось в списке
+    recordHistory();
+}
+
+function updateCakeGap(val) {
+    cakeGap = parseInt(val);
+    rebuildScene(); // Перестраиваем сцену с новым отступом
+    // Камеру не меняем, чтобы не сбивать настройку, просто двигаем торты
+}
+  
+init();
+</script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.log('SW registration failed', err));
+    });
+  }
+</script>
+</body>
+</html>
